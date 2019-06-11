@@ -1,0 +1,50 @@
+---
+title: ""
+output: github_document
+---
+
+```{r init, eval=TRUE, message=FALSE, warning=FALSE, echo=FALSE}
+
+# Libraries tidyr ---------------------------------------------------------
+
+  library("ggplot2") 
+  library("dplyr")   
+  library("readxl")
+  library("stringr")
+
+# Options for knitting the report -------------  
+  
+  library(knitr)
+  library(rmdformats)
+  library(kableExtra) 
+
+  knitr::opts_chunk$set(fig.width=8, 
+                        fig.height=6, 
+                        eval=TRUE, 
+                        cache=TRUE,
+                        echo=TRUE,
+                        prompt=FALSE,
+                        tidy=TRUE,
+                        comment=NA,
+                        message=FALSE,
+                        warning=FALSE)
+  opts_knit$set(width=90)
+  options(max.print="500")  
+  options(knitr.kable.NA = '')
+```
+
+
+
+```{r, echo=FALSE}
+
+primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+
+primers_wiki <- primers %>% 
+  filter(target_gene=="18S") %>% 
+  arrange(start_yeast) %>% 
+  mutate(doi = str_c("https://doi.org/", doi)) %>% 
+  select(name, sequence, direction, start_yeast, end_yeast, specificity, doi)
+
+knitr::kable(primers_wiki, format = 'markdown')
+
+```

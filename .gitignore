@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.md
+*.tsv
+*.rda
+*.tsv
+*.html
+*.md
+*cache
+*files
