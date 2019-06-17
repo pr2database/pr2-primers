@@ -55,8 +55,11 @@ pr2_active  <- pr2 %>% filter (is.na(removed_version)) %>%
                        filter (!str_detect(sequence,"[^ATGCU]"))
 
 
-primer_sets <- read_excel(path = "primers_18S.xlsx", sheet ="primer_sets")
-primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+pr2_db <- db_info("pr2_local")
+pr2_db_con <- db_connect(pr2_db)
+primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
+primer_sets <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
+disconnect <- db_disconnect(pr2_db_con)
 
 regions = c("V4", "V4-specific", "V9", "Universal")
 

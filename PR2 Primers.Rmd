@@ -19,6 +19,14 @@ output:
     highlight: kate
     number_sections : yes    
 ---
+
+```{r eval=FALSE, echo=FALSE, message=FALSE}
+# Use this command to render the file
+rmarkdown::render('PR2 Primers.Rmd', 
+                  output_file = '../../../Web site/vaulot.github.io/pr2/PR2_Primers.html', 
+                  output_format="rmdformats::readthedown")
+```
+
 # Goal
 * Testing primers against the PR2 database (latest version 4.11.1)
 
@@ -29,7 +37,6 @@ output:
     * In the other case, they can be set eval=FALSE
     
 ## To do
-* Use degenerated primers to locate the V4 and V9 region
 * Check why there are some negative amplicon (probably some matches ahead - Put a condition that amplicon should be >)
 
 ## References used
@@ -88,21 +95,17 @@ Load the variables common to the different scripts and the necessary libraries
 
 # Read primer file
 
-## Verify new primer labelling - DO NOT RERUN
-```{r, eval=FALSE}
-primer_sets <- read_excel(path = "primers_18S.xlsx", sheet ="primer sets")
-primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
-
-primers_fwd <- left_join(primer_sets, primers, by=c("fwd_id" = "primer_id")) %>% 
-  filter(fwd_seq != sequence)
-primer_rev <- left_join(primer_sets, primers, by=c("rev_id" = "primer_id")) %>% 
-  filter(rev_seq != sequence)
-```
-
 ## Compute position on yeast - DO NOT RERUN
 
 ```{r, eval=FALSE}
-primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+# primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+
+# Read from local database
+pr2_db <- db_info("pr2_local")
+pr2_db_con <- db_connect(pr2_db)
+primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
+disconnect <- db_disconnect(pr2_db_con)
+
 
 ref_seq <- pr2 %>% filter(pr2_accession == "FU970071.1.1799_U") 
 
@@ -123,8 +126,15 @@ write_tsv(primers, path = "primers_matches.tsv", na = "")
 
 ## Build the primer set table 1
 ```{r}
-primer_sets <- read_excel(path = "primers_18S.xlsx", sheet ="primer_sets")
-primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+# primer_sets <- read_excel(path = "primers_18S.xlsx", sheet ="primer_sets")
+# primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+
+# Read from local database
+pr2_db <- db_info("pr2_local")
+pr2_db_con <- db_connect(pr2_db)
+primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
+primer_sets <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
+disconnect <- db_disconnect(pr2_db_con)
 
 regions = c("V4", "V4-specific", "V9", "Universal")
 

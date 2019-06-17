@@ -3,6 +3,41 @@ title: ""
 output: github_document
 ---
 
+```{r eval=FALSE, echo=FALSE, message=FALSE}
+# Use this command to render the file
+rmarkdown::render('PR2 Primers Table.Rmd', 
+                  output_file = '/wiki/18S-rRNA-primers.md', 
+                  output_format="github_document", 
+                  encoding = 'UTF-8')
+```
+
+A compilation of 18S rRNA primers from the literature, mapped onto the reference SSU sequence for _[Saccharomyces cerevisiae](http://apollo.chemistry.gatech.edu/RibosomeGallery/S%20cerevisiae/SSU/3D%20structure%20based/index.html#S_cerevisiae.png)_ ([FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071), 1799 nucleotides, first nucleotide marked as 1) .
+
+Columns are as follows
+
+ column               | definition 
+| :------------------ | :------- |
+ name                | original name of the primer 
+ synonyms              | synonyms found in the litterature 
+ sequence  |
+ sequence revcomp | reverse complement of the sequence
+ direction | forward (fwd) or reverse (rev)
+ start | start of primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
+ end | end of primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
+ specificity | is the primer specific of a group
+ reference | original reference where primer was first defined
+ doi | link to original paper
+ 
+
+Please report errors or primers not listed here in the [Issues page of the PR2 database](https://github.com/vaulot/pr2_database/issues).
+
+#### Contributors
+Stefan Geisen: S.Geisen@nioo.knaw.nl   
+Fréderic Mahé: frederic.mahe@cirad.fr   
+Daniel Vaulot: vaulot@gmail.com   
+
+
+
 ```{r init, eval=TRUE, message=FALSE, warning=FALSE, echo=FALSE}
 
 # Libraries tidyr ---------------------------------------------------------
@@ -11,6 +46,7 @@ output: github_document
   library("dplyr")   
   library("readxl")
   library("stringr")
+  library("Biostrings")
 
 # Options for knitting the report -------------  
   
@@ -35,16 +71,29 @@ output: github_document
 
 
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
 
-primers <- read_excel(path = "primers_18S.xlsx", sheet ="primers")
+  pr2_db <- db_info("pr2_local")
+  pr2_db_con <- db_connect(pr2_db)
+  primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
+  disconnect <- db_disconnect(pr2_db_con)
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+
+sequence_revcomp=data.frame(sequence_revcomp = as.character(reverseComplement(DNAStringSet(primers$sequence))))
 
 primers_wiki <- primers %>% 
+  bind_cols(sequence_revcomp) %>% 
   filter(target_gene=="18S") %>% 
   arrange(start_yeast) %>% 
   mutate(doi = str_c("https://doi.org/", doi)) %>% 
-  select(name, sequence, direction, start_yeast, end_yeast, specificity, doi)
+  select(name, synonyms, sequence, `sequence revcomp`= sequence_revcomp,direction, start=start_yeast, end=end_yeast, specificity, reference, doi)
 
 knitr::kable(primers_wiki, format = 'markdown')
+
+
 
 ```
