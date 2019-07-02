@@ -133,14 +133,14 @@ write_tsv(primers, path = "primers_matches.tsv", na = "")
 pr2_db <- db_info("pr2_local")
 pr2_db_con <- db_connect(pr2_db)
 primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
-primer_sets <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
+primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
 regions = c("V4", "V4-specific", "V9", "Universal")
 
 # Just keep the selected primers (V4, V9 etc..)
-primer_sets <- primer_sets %>% 
-    filter(region %in%  regions)
+primer_sets <- primer_sets_all %>% 
+    filter(gene_region %in%  regions)
 
 primer_sets <- primer_sets %>% 
   left_join(select(primers, 
@@ -158,13 +158,14 @@ primer_sets <- primer_sets %>%
                  rev_end_yeast= end_yeast), 
           by = c("rev_id" = "primer_id")) %>% 
   mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
-  select(region:primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark)
+  select(gene_region, specificity, primer_set_id,primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark) %>% 
+  arrange(gene_region, specificity)
 
 write_tsv(primer_sets, path = "primers_Table_1.tsv", na = "")
 
 
 
-knitr::kable(select(primer_sets,region:primer_set_name, fwd_name, rev_name, length_yeast)) %>%
+knitr::kable(select(primer_sets,primer_set_id:primer_set_name, fwd_name, rev_name, length_yeast)) %>%
   kableExtra::kable_styling()
        
 ```
@@ -199,7 +200,7 @@ This avoids recomputing each time
 
   load(file="pr2_match.rda")
   pr2_match_final <-  pr2_match_final %>% 
-    filter(region %in% regions) 
+    filter(gene_region %in% regions) 
   
     
 
@@ -255,7 +256,7 @@ for (one_primer_set in c(16)){
 
   pr2_match_summary_primer_set <- pr2_match_final %>% 
                       filter(sequence_length>= 1500) %>% 
-                      group_by(region, primer_label, primer_set_id ) %>% 
+                      group_by(gene_region, primer_label, primer_set_id ) %>% 
                       summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
                                  pct_rev = sum(!is.na(rev_pos))/n()*100,
                                  pct_amplicons = sum(!is.na(ampli_size))/n()*100, 
@@ -285,7 +286,7 @@ for (one_primer_set in c(16)){
 
   pr2_match_summary_primer_set_sg <- pr2_match_final %>% 
                       filter(sequence_length>= 1500) %>% 
-                      group_by(supergroup, region, primer_label, primer_set_id) %>% 
+                      group_by(supergroup, gene_region, primer_label, primer_set_id) %>% 
                       summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
                                  pct_rev = sum(!is.na(rev_pos))/n()*100,
                                  pct_amplicons = sum(!is.na(ampli_size))/n()*100, 
@@ -307,7 +308,7 @@ for (one_primer_set in c(16)){
 
   pr2_match_summary_primer_set_class <- pr2_match_final %>% 
                       filter(sequence_length>= 1500) %>% 
-                      group_by(supergroup, division, class, region, primer_label, primer_set_id) %>% 
+                      group_by(supergroup, division, class, gene_region, primer_label, primer_set_id) %>% 
                       summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
                                  pct_rev = sum(!is.na(rev_pos))/n()*100,
                                  pct_amplicons = sum(!is.na(ampli_size))/n()*100, 

@@ -6,7 +6,7 @@ output: github_document
 ```{r eval=FALSE, echo=FALSE, message=FALSE}
 # Use this command to render the file
 rmarkdown::render('PR2 Primers Table.Rmd', 
-                  output_file = '/wiki/18S-rRNA-primers.md', 
+                  output_file = "C:/daniel.vaulot@gmail.com/Databases/_PR2/primers/wiki/18S-rRNA-primers.md", 
                   output_format="github_document", 
                   encoding = 'UTF-8')
 ```
@@ -47,6 +47,7 @@ Daniel Vaulot: vaulot@gmail.com
   library("readxl")
   library("stringr")
   library("Biostrings")
+  library("dvutils")
 
 # Options for knitting the report -------------  
   
@@ -87,10 +88,10 @@ sequence_revcomp=data.frame(sequence_revcomp = as.character(reverseComplement(DN
 
 primers_wiki <- primers %>% 
   bind_cols(sequence_revcomp) %>% 
-  filter(target_gene=="18S") %>% 
+  filter(gene=="18S rRNA") %>% 
   arrange(start_yeast) %>% 
   mutate(doi = str_c("https://doi.org/", doi)) %>% 
-  select(name, synonyms, sequence, `sequence revcomp`= sequence_revcomp,direction, start=start_yeast, end=end_yeast, specificity, reference, doi)
+  select(primer_id, name, synonyms, sequence, `sequence revcomp`= sequence_revcomp,direction, start=start_yeast, end=end_yeast, specificity, reference, doi)
 
 knitr::kable(primers_wiki, format = 'markdown')
 

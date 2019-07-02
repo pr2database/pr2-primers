@@ -61,11 +61,11 @@ primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
 primer_sets <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
-regions = c("V4", "V4-specific", "V9", "Universal")
+gene_regions = c("V4", "V4-specific", "V9", "Universal")
 
 # Just keep the selected primers (V4, V9 etc..)
 primer_sets <- primer_sets %>% 
-    filter(region %in%  regions)
+    filter(gene_region %in%  gene_regions)
 
 primer_sets <- primer_sets %>% 
   left_join(select(primers, 
@@ -83,7 +83,7 @@ primer_sets <- primer_sets %>%
                  rev_end_yeast= end_yeast), 
           by = c("rev_id" = "primer_id")) %>% 
   mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
-  select(region:primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark)
+  select(primer_set_id:specificity, contains("fwd"), contains("rev"),length_yeast, used_in:remark)
 
   
 # Run loops through primers  
@@ -97,10 +97,10 @@ i = 1
 
  print(sprintf("Primer set : %d", i))
 
- region <- primer_sets$region[[i]]  
+ gene_region <- primer_sets$gene_region[[i]]  
  primer_set_id <- as.integer(primer_sets$primer_set_id[[i]])
- primer_label = str_c(str_sub(primer_sets$region[[i]],1,2), 
-                      str_sub(str_replace_na(primer_sets$specific[[i]], replacement = ""),1,3), 
+ primer_label = str_c(str_sub(primer_sets$gene_region[[i]],1,2), 
+                      str_sub(str_replace_na(primer_sets$specificity[[i]], replacement = ""),1,3), 
                       sprintf("%02d", primer_sets$primer_set_id[[i]]), sep="_")
  fwd <-  DNAString(primer_sets$fwd_seq[[i]])
  rev <-  DNAString(primer_sets$rev_seq[[i]])
@@ -140,7 +140,7 @@ i = 1
  
 # Merge the fwd and reverse position, compute the length of the amplicon and check it is bigger than sum of the lengths of the two primers
  pr2_match[[i]] <- select(pr2_active, pr2_accession, kingdom:genus, species, sequence_length) %>% 
-    mutate(region=region, primer_set_id= primer_set_id, primer_label = primer_label) %>% 
+    mutate(gene_region=gene_region, primer_set_id= primer_set_id, primer_label = primer_label) %>% 
     left_join(fwd_matches_unique) %>% 
     left_join(rev_matches_unique) %>%  
     mutate(ampli_size = case_when( !is.na(fwd_pos) & 
