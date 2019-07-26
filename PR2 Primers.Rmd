@@ -92,6 +92,16 @@ Load the variables common to the different scripts and the necessary libraries
   options(knitr.kable.NA = '')
 ```
 
+# Constants
+
+```{r}
+gene_selected = "16S_rRNA"
+sequence_length_min = 0
+
+# for Geisen paper
+gene_selected = "18S_rRNA"
+sequence_length_min = 1500 
+```
 
 # Read primer file
 
@@ -136,11 +146,15 @@ primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
 primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
-regions = c("V4", "V4-specific", "V9", "Universal")
-
-# Just keep the selected primers (V4, V9 etc..)
-primer_sets <- primer_sets_all %>% 
-    filter(gene_region %in%  regions)
+if(gene_selected == "18S") {
+  gene_regions = c("V4", "V4-specific", "V9", "Universal")
+  # Just keep the selected primers (V4, V9 etc..)
+  primer_sets <- primer_sets %>% 
+  filter(gene_region %in%  gene_regions)
+  } else{
+  primer_sets <- primer_sets %>% 
+  filter(specificity ==  "plastid" | (gene == gene_selected & gene_region == "Universal" ))
+}
 
 primer_sets <- primer_sets %>% 
   left_join(select(primers, 
@@ -198,10 +212,12 @@ One could also use another function which does not give the position
 This avoids recomputing each time
 ```{r load_matches}
 
-  load(file="pr2_match.rda")
-  pr2_match_final <-  pr2_match_final %>% 
-    filter(gene_region %in% regions) 
-  
+  load(file=str_c("pr2_match_",gene_selected,".rda"))
+
+# The next lines are not nessary because this was done during the calculation....
+  # pr2_match_final <-  pr2_match_final %>% 
+  #   filter(gene_region %in% regions) 
+  # 
     
 
 ```
@@ -255,7 +271,7 @@ for (one_primer_set in c(16)){
 ```{r summary_euks}
 
   pr2_match_summary_primer_set <- pr2_match_final %>% 
-                      filter(sequence_length>= 1500) %>% 
+                      filter(sequence_length>= sequence_length_min) %>% 
                       group_by(gene_region, primer_label, primer_set_id ) %>% 
                       summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
                                  pct_rev = sum(!is.na(rev_pos))/n()*100,
@@ -266,7 +282,7 @@ for (one_primer_set in c(16)){
                                  ampli_size_min = min(ampli_size, na.rm=TRUE),
                                  n_seq = n())  
  
-  write_tsv(pr2_match_summary_primer_set, "pr2_match_summary_primer_set.tsv", na="")
+  write_tsv(pr2_match_summary_primer_set, str_c("pr2_match_summary_primer_set_",gene_selected,".tsv"), na="")
   
 # Long form for Number of sequences
   
@@ -285,7 +301,7 @@ for (one_primer_set in c(16)){
 ```{r summary_supergroups, warning=FALSE}
 
   pr2_match_summary_primer_set_sg <- pr2_match_final %>% 
-                      filter(sequence_length>= 1500) %>% 
+                      filter(sequence_length>= sequence_length_min) %>% 
                       group_by(supergroup, gene_region, primer_label, primer_set_id) %>% 
                       summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
                                  pct_rev = sum(!is.na(rev_pos))/n()*100,
@@ -297,8 +313,8 @@ for (one_primer_set in c(16)){
                                  n_seq = n())  %>% 
                       ungroup()
  
-  write_tsv(pr2_match_summary_primer_set_sg, "pr2_match_summary_primer_set_per_sg.tsv", na="")
-  
+
+  write_tsv( pr2_match_summary_primer_set_sg, str_c("pr2_match_summary_primer_set_",gene_selected,"_per_sg.tsv"), na="")
   
 ```
 
@@ -307,7 +323,7 @@ for (one_primer_set in c(16)){
 ```{r summary_class, warning=FALSE}
 
   pr2_match_summary_primer_set_class <- pr2_match_final %>% 
-                      filter(sequence_length>= 1500) %>% 
+                      filter(sequence_length>= sequence_length_min) %>% 
                       group_by(supergroup, division, class, gene_region, primer_label, primer_set_id) %>% 
                       summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
                                  pct_rev = sum(!is.na(rev_pos))/n()*100,
@@ -318,8 +334,7 @@ for (one_primer_set in c(16)){
                                  ampli_size_min = case_when (pct_amplicons>0 ~ min(ampli_size, na.rm=TRUE)),
                                  n_seq = n())  
  
-  write_tsv(pr2_match_summary_primer_set_class, "pr2_match_summary_primer_set_per_class.tsv", na="")
-  
+  write_tsv(pr2_match_summary_primer_set_class, str_c("pr2_match_summary_primer_set_",gene_selected,"_per_class.tsv"), na="")  
   
 ```
 

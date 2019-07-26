@@ -42,17 +42,31 @@
   opts_knit$set(width=90)
   options(max.print="500")  
   options(knitr.kable.NA = '')
+  
+# Parameters
+  
+  max_mismatch = 0
+  gene_selected = "16S_rRNA"
 
 # Read pr2
-  
-data(pr2)
+
+    
+  # From R object <- Use for Geisen paper
+  data(pr2)
+
+  # From database for other anlaysis
+  pr2_active  <- pr2_read()
 
 # Remove 
 # * Any sequence not in PR2
 # * Any sequence with ambuiguities
+#  * Choose 18S or 16S
 
-pr2_active  <- pr2 %>% filter (is.na(removed_version)) %>% 
-                       filter (!str_detect(sequence,"[^ATGCU]"))
+pr2_active  <- pr2_active %>% 
+  filter (is.na(removed_version)) %>% 
+  filter (!str_detect(sequence,"[^ATGCU]")) %>% 
+  filter(gene == gene_selected )
+
 
 
 pr2_db <- db_info("pr2_local")
@@ -61,11 +75,17 @@ primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
 primer_sets <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
-gene_regions = c("V4", "V4-specific", "V9", "Universal")
-
+if(gene_selected == "18S") {
+  gene_regions = c("V4", "V4-specific", "V9", "Universal")
 # Just keep the selected primers (V4, V9 etc..)
-primer_sets <- primer_sets %>% 
-    filter(gene_region %in%  gene_regions)
+  primer_sets <- primer_sets %>% 
+  filter(gene_region %in%  gene_regions)
+  } else{
+  primer_sets <- primer_sets %>% 
+  filter(specificity ==  "plastid" | (gene == "18S rRNA" & gene_region == "Universal" ))
+}
+
+
 
 primer_sets <- primer_sets %>% 
   left_join(select(primers, 
@@ -89,7 +109,6 @@ primer_sets <- primer_sets %>%
 # Run loops through primers  
   
 pr2_match <- list()
-max_mismatch <- 0
 
 i = 1
 
@@ -158,4 +177,4 @@ i = 1
 
 ## Save the big data file
 
-  save(pr2_match_final, file="pr2_match.rda")
+  save(pr2_match_final, file=str_c("pr2_match_", gene_selected, ".rda"))
