@@ -5,7 +5,7 @@ output: github_document
 
 ```{r eval=FALSE, echo=FALSE, message=FALSE}
 # Use this command to render the file
-rmarkdown::render('PR2 Primer Sets Table.Rmd', 
+rmarkdown::render('Table PR2 Primer Sets.Rmd', 
                   output_file = 'C:/daniel.vaulot@gmail.com/Databases/_PR2/primers/wiki/18S-rRNA-primer-sets.md', 
                   output_format="github_document", 
                   encoding = 'UTF-8')
@@ -34,12 +34,13 @@ Columns are as follows
   doi | link to original paper
  
 
-Please report errors or primer sets not listed here in the [Issues page of the PR2 database](https://github.com/vaulot/pr2_database/issues).
+Please report errors or primer sets not listed here in the [Issues page of the PR2 primer database](https://github.com/pr2database/pr2-primers/issues).
 
 #### Contributors
-Stefan Geisen: S.Geisen@nioo.knaw.nl   
-Fréderic Mahé: frederic.mahe@cirad.fr   
-Daniel Vaulot: vaulot@gmail.com   
+* Stefan Geisen: S.Geisen@nioo.knaw.nl   
+* Fréderic Mahé: frederic.mahe@cirad.fr   
+* Daniel Vaulot: vaulot@gmail.com
+* Enrique Lara: enrique.lara@rjb.csic.es
 
 
 
