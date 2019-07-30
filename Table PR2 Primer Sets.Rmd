@@ -13,14 +13,16 @@ rmarkdown::render('Table PR2 Primer Sets.Rmd',
 
 A compilation of 18S rRNA primer sets for metabarcoding compiled from the literature, mapped onto the reference SSU sequence for _[Saccharomyces cerevisiae](http://apollo.chemistry.gatech.edu/RibosomeGallery/S%20cerevisiae/SSU/3D%20structure%20based/index.html#S_cerevisiae.png)_ ([FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071), 1799 nucleotides, first nucleotide marked as 1) .
 
+**Trick**: If you are using Chrome, use this [extension](https://chrome.google.com/webstore/detail/wide-github/kaalofacklcidaampbokdplbklpeldpj) to view the full width of the table.
+
 Columns are as follows
 
  column               | definition 
 | :------------------ | :------- |
-  name                | original name of the primer 
   region | gene region targetted. Universal corresponds to primer sets that amplify both prokaryotes and eukaryotes
   specificity |  is the primer specific of a group
-  primer_set_name | 
+  primer_set_id | id of the primer set  in pr2-primers database
+  primer_set_name |  name of the primer set (usually from author)
   fwd_name | forward primer name
   fwd_seq | forward primer sequence
   fwd_start | start of forward primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
@@ -86,11 +88,10 @@ Please report errors or primer sets not listed here in the [Issues page of the P
   primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
   disconnect <- db_disconnect(pr2_db_con)
   
-  regions = c("V4", "V4-specific", "V9", "Universal")
-  
-  # Just keep the selected primers (V4, V9 etc..)
+  # Just keep the 18S rRNA primers
   primer_sets <- primer_sets_all %>% 
-      filter(gene_region %in%  regions)
+      filter(gene ==  "18S rRNA") 
+      
   
   primer_sets <- primer_sets %>% 
     left_join(select(primers, 
@@ -108,7 +109,7 @@ Please report errors or primer sets not listed here in the [Issues page of the P
                    rev_end_yeast= end_yeast), 
             by = c("rev_id" = "primer_id")) %>% 
     mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
-    select(gene_region, specificity, primer_set_id,primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark) %>% 
+    select(primer_set_id, gene_region, specificity, primer_set_id,primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark) %>% 
     arrange(gene_region, specificity)
 ```
 
@@ -119,7 +120,7 @@ primer_sets_wiki <-primer_sets %>%
   mutate(doi = str_c("https://doi.org/", reference_doi)) %>%
   arrange(fwd_start_yeast) %>%
   rename_all(funs(str_replace(., "_yeast", ""))) %>% 
-  select(gene_region, specificity, primer_set_name,  contains("fwd"), contains("rev"), length, reference, doi, -fwd_id, -rev_id)
+  select(gene_region, specificity,primer_set_id, primer_set_name,  contains("fwd"), contains("rev"), length, reference, doi, -fwd_id, -rev_id)
 
 knitr::kable(primer_sets_wiki, format = 'markdown')
 

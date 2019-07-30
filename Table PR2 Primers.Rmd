@@ -13,10 +13,13 @@ rmarkdown::render('Table PR2 Primers.Rmd',
 
 A compilation of 18S rRNA primers from the literature, mapped onto the reference SSU sequence for _[Saccharomyces cerevisiae](http://apollo.chemistry.gatech.edu/RibosomeGallery/S%20cerevisiae/SSU/3D%20structure%20based/index.html#S_cerevisiae.png)_ ([FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071), 1799 nucleotides, first nucleotide marked as 1) .
 
+**Trick**: If you are using Chrome, use this [extension](https://chrome.google.com/webstore/detail/wide-github/kaalofacklcidaampbokdplbklpeldpj) to view the full width of the table.
+
 Columns are as follows
 
  column               | definition 
 | :------------------ | :------- |
+ primer_id              | primer id in pr2-primers database
  name                | original name of the primer 
  synonyms              | synonyms found in the litterature 
  sequence  |

@@ -146,11 +146,13 @@ primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
 primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
-if(gene_selected == "18S") {
-  gene_regions = c("V4", "V4-specific", "V9", "Universal")
+if(gene_selected == "18S rRNA") {
+  gene_regions = c("V4", "V9")
   # Just keep the selected primers (V4, V9 etc..)
-  primer_sets <- primer_sets %>% 
-  filter(gene_region %in%  gene_regions)
+  primer_sets <- primer_sets_all %>% 
+  filter(gene == gene_selected) %>% 
+  filter(gene_region %in%  gene_regions) %>% 
+  filter(!(primer_set_id %in% 63:66))
   } else{
   primer_sets <- primer_sets %>% 
   filter(specificity ==  "plastid" | (gene == gene_selected & gene_region == "Universal" ))
