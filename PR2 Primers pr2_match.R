@@ -46,7 +46,7 @@
 # Parameters
   
   max_mismatch = 0
-  gene_selected = "16S_rRNA"
+  gene_selected = "18S_rRNA"
 
 # Read pr2
 
@@ -65,24 +65,27 @@
 pr2_active  <- pr2_active %>% 
   filter (is.na(removed_version)) %>% 
   filter (!str_detect(sequence,"[^ATGCU]")) %>% 
-  filter(gene == gene_selected )
+  filter(gene == gene_selected )  
+  
 
 
 
 pr2_db <- db_info("pr2_local")
 pr2_db_con <- db_connect(pr2_db)
 primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
-primer_sets <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
+primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
-if(gene_selected == "18S") {
-  gene_regions = c("V4", "V4-specific", "V9", "Universal")
-# Just keep the selected primers (V4, V9 etc..)
-  primer_sets <- primer_sets %>% 
-  filter(gene_region %in%  gene_regions)
+if(gene_selected == "18S_rRNA") {
+  gene_regions = c("V4", "V9")
+  # Just keep the selected primers (V4, V9 etc..)
+  primer_sets <- primer_sets_all %>% 
+  filter(gene == gene_selected) %>% 
+  filter(gene_region %in%  gene_regions) %>% 
+  filter(!(primer_set_id %in% 63:66))
   } else{
   primer_sets <- primer_sets %>% 
-  filter(specificity ==  "plastid" | (gene == "18S rRNA" & gene_region == "Universal" ))
+  filter(specificity ==  "plastid" | (gene == "18S_rRNA" & specificity == "universal" ))
 }
 
 
@@ -119,8 +122,9 @@ i = 1
  gene_region <- primer_sets$gene_region[[i]]  
  primer_set_id <- as.integer(primer_sets$primer_set_id[[i]])
  primer_label = str_c(str_sub(primer_sets$gene_region[[i]],1,2), 
-                      str_sub(str_replace_na(primer_sets$specificity[[i]], replacement = ""),1,3), 
-                      sprintf("%02d", primer_sets$primer_set_id[[i]]), sep="_")
+                      sprintf("%02d", primer_sets$primer_set_id[[i]]), 
+                      str_sub(str_replace_na(primer_sets$specificity[[i]], replacement = ""),1,3),
+                      sep="_")
  fwd <-  DNAString(primer_sets$fwd_seq[[i]])
  rev <-  DNAString(primer_sets$rev_seq[[i]])
  rev <-  reverseComplement(rev)
@@ -158,7 +162,7 @@ i = 1
                                         summarise(rev_pos = max(rev_pos))
  
 # Merge the fwd and reverse position, compute the length of the amplicon and check it is bigger than sum of the lengths of the two primers
- pr2_match[[i]] <- select(pr2_active, pr2_accession, kingdom:genus, species, sequence_length) %>% 
+ pr2_match[[i]] <- select(pr2_active, pr2_accession, kingdom:genus, species, sequence_length, sequence) %>% 
     mutate(gene_region=gene_region, primer_set_id= primer_set_id, primer_label = primer_label) %>% 
     left_join(fwd_matches_unique) %>% 
     left_join(rev_matches_unique) %>%  
@@ -166,7 +170,15 @@ i = 1
                                    !is.na(rev_pos)  ~ rev_pos - fwd_pos + 1)) %>% 
    # Must use _NA_real_ and not NA alone because will cause an error....
     mutate(ampli_size = case_when( ampli_size < (length(fwd) + length(rev)) ~  NA_real_,  
-                                   TRUE ~ ampli_size)) 
+                                   TRUE ~ ampli_size),
+   # The next line remove sequence that do not have the canonical sequence GGATCA at the end of the the V9 region
+   # and are likely to be too short
+           keep_sequence = case_when(gene_region == "V9" & 
+                                       !is.na(fwd_pos) & 
+                                       !str_detect(str_sub(sequence, start=fwd_pos), "GGATC[AT]") ~ FALSE,
+                                     TRUE ~ TRUE)) %>% 
+    select(-sequence) %>% 
+    filter(keep_sequence == TRUE)
 
 }
 

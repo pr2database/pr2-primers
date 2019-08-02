@@ -90,7 +90,7 @@ Please report errors or primer sets not listed here in the [Issues page of the P
   
   # Just keep the 18S rRNA primers
   primer_sets <- primer_sets_all %>% 
-      filter(gene ==  "18S rRNA") 
+      filter(gene ==  "18S_rRNA") 
       
   
   primer_sets <- primer_sets %>% 

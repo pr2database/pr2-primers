@@ -92,7 +92,7 @@ sequence_revcomp=data.frame(sequence_revcomp = as.character(reverseComplement(DN
 
 primers_wiki <- primers %>% 
   bind_cols(sequence_revcomp) %>% 
-  filter(gene=="18S rRNA") %>% 
+  filter(gene=="18S_rRNA") %>% 
   arrange(start_yeast) %>% 
   mutate(doi = str_c("https://doi.org/", doi)) %>% 
   select(primer_id, name, synonyms, sequence, `sequence revcomp`= sequence_revcomp,direction, start=start_yeast, end=end_yeast, specificity, reference, doi)
