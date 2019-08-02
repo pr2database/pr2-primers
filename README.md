@@ -7,9 +7,10 @@ The pr2-primers database hosts list of 18S rRNA primers, primer-sets and in sili
 * [_In silico_ analysis of primer sets against the PR<sup>2</sup>](https://vaulot.github.io/pr2/PR2_Primers.html)
 
 # Contributors
-* Stefan Geisen
-* Enrique Lara
-* Frédéric Mahé
+* Stefan Geisen: <S.Geisen@nioo.knaw.nl>  
+* Fréderic Mahé: <frederic.mahe@cirad.fr>  
+* Daniel Vaulot: <vaulot@gmail.com>
+* Enrique Lara: <enrique.lara@rjb.csic.es>
 
 # Issues and contributions
 Please report all issues or un-listed primers [here](https://github.com/pr2database/pr2-primers/issues)
