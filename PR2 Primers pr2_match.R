@@ -45,8 +45,19 @@
   
 # Parameters
   
-  max_mismatch = 0
-  gene_selected = "18S_rRNA"
+  max_mismatch = 2
+  gene_selected = "18S_rRNA"  # Can be 18S_rRNA or 16_rRNA
+  rda_file_label = "_set_84"  # This label is added at the end of the rda file name
+  
+  # gene_regions = c("V4", "V9")
+  gene_regions = c("V3")
+  
+ # primer_sets_included = 1:100
+  primer_sets_included = 84
+  if (length(primer_sets_included) == 1) rda_file_label = str_c("_set_", primer_set_id_selected)
+  
+#  primer_sets_excluded = c(63:66,83)
+  primer_sets_excluded = 0
 
 # Read pr2
 
@@ -54,7 +65,7 @@
   # From R object <- Use for Geisen paper
   data(pr2)
 
-  # From database for other anlaysis
+  # From database for other analysis
   pr2_active  <- pr2_read()
 
 # Remove 
@@ -77,15 +88,16 @@ primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
 disconnect <- db_disconnect(pr2_db_con)
 
 if(gene_selected == "18S_rRNA") {
-  gene_regions = c("V4", "V9")
   # Just keep the selected primers (V4, V9 etc..)
   primer_sets <- primer_sets_all %>% 
   filter(gene == gene_selected) %>% 
   filter(gene_region %in%  gene_regions) %>% 
-  filter(!(primer_set_id %in% 63:66))
+  filter( (primer_set_id %in% primer_sets_included)) %>%
+  filter(!(primer_set_id %in% primer_sets_excluded))  
   } else{
-  primer_sets <- primer_sets %>% 
-  filter(specificity ==  "plastid" | (gene == "18S_rRNA" & specificity == "universal" ))
+  primer_sets <- primer_sets_all %>% 
+  filter((gene == "16S_rRNA" & specificity ==  "plastid") | 
+         (gene == "18S_rRNA" & specificity == "universal" ))
 }
 
 
@@ -117,7 +129,7 @@ i = 1
 
  for (i in 1:nrow(primer_sets)) {
 
- print(sprintf("Primer set : %d", i))
+ print(sprintf("Primer set : %d", primer_sets$primer_set_id[[i]]))
 
  gene_region <- primer_sets$gene_region[[i]]  
  primer_set_id <- as.integer(primer_sets$primer_set_id[[i]])
@@ -189,4 +201,6 @@ i = 1
 
 ## Save the big data file
 
-  save(pr2_match_final, file=str_c("pr2_match_", gene_selected, ".rda"))
+  save(pr2_match_final, file=str_c("output/pr2_match_", gene_selected ,rda_file_label, "_mismatches_", max_mismatch, ".rda"))
+  
+

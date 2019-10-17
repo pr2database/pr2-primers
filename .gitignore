@@ -13,3 +13,5 @@
 archives
 ~*
 wiki/
+*.xlsx#
+pr2_alignement*

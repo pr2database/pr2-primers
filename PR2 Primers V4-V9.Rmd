@@ -1,0 +1,681 @@
+---
+title: "Testing primers against PR2"
+author: "Daniel Vaulot"
+date: '`r format(Sys.time(), "%d %m %Y")`'
+header-includes:
+   - \usepackage{color, fancyvrb}
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: yes
+    toc_depth: 3
+    number_sections : yes
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+    number_sections : yes
+  rmdformats::readthedown:
+    highlight: kate
+    number_sections : yes    
+---
+
+```{r eval=FALSE, echo=FALSE, message=FALSE}
+# Use this command to render the file
+rmarkdown::render('PR2 Primers.Rmd', 
+                  output_file = '../../../Web site/vaulot.github.io/pr2/PR2_Primers.html', 
+                  output_format="rmdformats::readthedown")
+```
+
+# Goal
+* Testing primers against the PR2 database (latest version 4.11.1)
+
+# Notes about script
+* Chunks `compute_matches` and `store_matches` have only to be run in 2 cases
+    * new version of pr2
+    * new set of primers
+    * In the other case, they can be set eval=FALSE
+    
+## To do
+* Check why there are some negative amplicon (probably some matches ahead - Put a condition that amplicon should be >)
+
+## References used
+* https://bioconductor.statistik.tu-dortmund.de/packages/3.4/bioc/vignettes/IRanges/inst/doc/IRangesOverview.pdf
+* http://kasperdanielhansen.github.io/genbioconductor/
+
+# Initialize
+Load the variables common to the different scripts and the necessary libraries
+
+```{r init, eval=TRUE, message=FALSE, warning=FALSE}
+
+# Libraries for bioinfo ----------------------------------------------------
+
+  library("Biostrings")
+
+# Libraries tidyr ---------------------------------------------------------
+
+  library("ggplot2") 
+  library("dplyr")   
+  library("readxl")
+  library("tibble")
+  library("readr")
+  library("purrr")
+  library("forcats")
+  library("lubridate")
+  library("stringr")
+
+# Libraries dvutils and pr2database -------------------------------------------------------
+  if(any(grepl("package:dvutils", search()))) detach("package:dvutils", unload=TRUE)
+  library("dvutils")
+
+  if(any(grepl("package:pr2database", search()))) detach("package:pr2database", unload=TRUE)
+  library("pr2database")
+
+# Options for knitting the report -------------  
+  
+  library(knitr)
+  library(rmdformats)
+  library(kableExtra) 
+
+  knitr::opts_chunk$set(fig.width=8, 
+                        fig.height=6, 
+                        eval=TRUE, 
+                        cache=TRUE,
+                        echo=TRUE,
+                        prompt=FALSE,
+                        tidy=TRUE,
+                        comment=NA,
+                        message=FALSE,
+                        warning=FALSE)
+  opts_knit$set(width=90)
+  options(max.print="500")  
+  options(knitr.kable.NA = '')
+```
+
+# Constants
+
+```{r}
+gene_selected = "16S_rRNA"
+
+# for Geisen paper
+gene_selected = "18S_rRNA"
+sequence_length_min = 400
+sequence_length_min_V9 = 1650 
+sequence_length_min_V4 = 1200 
+```
+
+# Read primer file
+
+## Compute position on yeast - DO NOT RERUN
+
+```{r, eval=FALSE}
+
+# Read from local database
+pr2_db <- db_info("pr2_local")
+pr2_db_con <- db_connect(pr2_db)
+primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
+disconnect <- db_disconnect(pr2_db_con)
+
+
+ref_seq <- pr2 %>% filter(pr2_accession == "FU970071.1.1799_U") 
+
+# Matches the position of the primers on the yeast sequence
+#  - use map2_dfr to get an data frame on output and not a list
+#  - use ~ when defining the function
+
+primers_pos <- map2_dfr(primers$sequence,
+                    primers$direction, 
+                    ~ get_primer_position(.x, ref_seq$sequence, orientation =.y, mismatches = 3))
+
+primers <- bind_cols(primers, primers_pos)
+
+write_tsv(primers, path = "output/primers_matches.tsv", na = "")
+```
+
+
+
+## Build the primer set table 1
+```{r}
+
+# Read from local database
+pr2_db <- db_info("pr2_local")
+pr2_db_con <- db_connect(pr2_db)
+primers <- tbl(pr2_db_con, "pr2_primers") %>% collect()
+primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% collect()
+disconnect <- db_disconnect(pr2_db_con)
+
+if(gene_selected == "18S_rRNA") {
+  gene_regions = c("V4", "V9")
+  # Just keep the selected primers (V4, V9 etc..)
+  primer_sets <- primer_sets_all %>% 
+  filter(gene == gene_selected) %>% 
+  filter(gene_region %in%  gene_regions) %>% 
+  filter(!(primer_set_id %in% 63:66))
+  } else{
+  primer_sets <- primer_sets %>% 
+  filter(specificity ==  "plastid" | (gene == "18S_rRNA" & specificity == "universal" ))
+}
+
+primer_sets <- primer_sets %>% 
+  left_join(select(primers, 
+                   primer_id, 
+                   fwd_name=name,
+                   fwd_seq=sequence, 
+                   fwd_start_yeast= start_yeast, 
+                   fwd_end_yeast= end_yeast), 
+            by = c("fwd_id" = "primer_id")) %>% 
+  left_join(select(primers, 
+                 primer_id, 
+                 rev_name=name,
+                 rev_seq=sequence, 
+                 rev_start_yeast= start_yeast, 
+                 rev_end_yeast= end_yeast), 
+          by = c("rev_id" = "primer_id")) %>% 
+  mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
+  select(gene_region, specificity, primer_set_id,primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark) %>% 
+  arrange(gene_region,  fwd_start_yeast)
+
+write_tsv(primer_sets, path = "output/primers_Table_1.tsv", na = "")
+
+
+
+knitr::kable(select(primer_sets,primer_set_id:primer_set_name, fwd_name, rev_name, length_yeast)) %>%
+  kableExtra::kable_styling()
+       
+```
+
+# Computing the matches
+
+This part is done by an R script `PR2 Primers pr2_match.R` that is executed in batch mode.
+
+## Programing Notes
+
+* Use Biostrings
+
+Accessor methods : In the code snippets below, x is an MIndex object.  
+
+* length(x): The number of patterns that matches are stored for.
+* names(x): The names of the patterns that matches are stored for.
+* startIndex(x): A list containing the starting positions of the matches for each pattern.
+* endIndex(x): A list containing the ending positions of the matches for each pattern.
+* elementNROWS(x): An integer vector containing the number of matches for each pattern.
+* x[[i]]: Extract the matches for the i-th pattern as an IRanges object.
+* unlist(x, recursive=TRUE, use.names=TRUE): Return all the matches in a single IRanges object. recursive and use.names are ignored.
+* extractAllMatches(subject, mindex): Return all the matches in a single XStringViews object.
+
+One could also use another function which does not give the position
+* match_fwd <- vcountPattern(fwd, seq,max.mismatch=0, min.mismatch=0, with.indels=FALSE, fixed=FALSE, algorithm="auto")
+
+
+# Load the data file
+
+This avoids recomputing each time.
+
+All sequences for which introns have been removed are filtered out (contain "_UC" in pr2_accession)
+
+```{r load_matches}
+
+  load(file=str_c("output/pr2_match_",gene_selected,".rda"))
+
+  print(str_c("Before filtration: ", nrow(pr2_match_final)))
+
+  pr2_match_final_filtered <- pr2_match_final %>% 
+    # Remove sequences for which the introns have been removed
+      filter(! str_detect(pr2_accession, "_UC")) %>% 
+    # Remove sequence that are shorter
+      filter((gene_region == "V4" & sequence_length>= sequence_length_min_V4) |
+             (gene_region == "V9" & sequence_length>= sequence_length_min_V9) |
+             (! (gene_region %in% c("V4", "V9") & sequence_length>= sequence_length_min)))
+    
+
+  print(str_c("After filtration: ", nrow(pr2_match_final_filtered)))
+
+  
+# The next lines are not nessary because this was done during the calculation....
+  # pr2_match_final <-  pr2_match_final %>% 
+  #   filter(gene_region %in% regions) 
+  # 
+    
+
+```
+
+# Summarize the data in tables
+
+## Summarize all eukaryotes
+
+```{r summary_euks}
+
+  pr2_match_summary_primer_set <- pr2_match_final_filtered  %>% 
+                      group_by(gene_region, primer_label, primer_set_id ) %>% 
+                      summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
+                                 pct_rev = sum(!is.na(rev_pos))/n()*100,
+                                 pct_amplicons = sum(!is.na(ampli_size))/n()*100, 
+                                 ampli_size_mean = mean(ampli_size, na.rm=TRUE),
+                                 ampli_size_sd = sd(ampli_size, na.rm=TRUE),
+                                 ampli_size_max = max(ampli_size, na.rm=TRUE),
+                                 ampli_size_min = min(ampli_size, na.rm=TRUE),
+                                 n_seq = n())  
+ 
+  write_tsv(pr2_match_summary_primer_set, str_c("output/pr2_match_summary_primer_set_",gene_selected,".tsv"), na="")
+  
+# Long form for Number of sequences
+  
+  # This dataframe is used to re-order the bars correctly
+  pct_category_order <- data.frame(pct_category = c("pct_amplicons","pct_fwd","pct_rev"), pct_category_order = c(3, 1, 2))
+  
+  pr2_match_summary_primer_set_long <- pr2_match_summary_primer_set %>% 
+    tidyr::gather("pct_category", "pct_seq", pct_fwd:pct_amplicons) %>% 
+    left_join(pct_category_order)
+  
+  
+```
+
+## Summarize per supergroup
+
+```{r summary_supergroups, warning=FALSE}
+
+  pr2_match_summary_primer_set_sg <- pr2_match_final_filtered  %>% 
+                      group_by(supergroup, gene_region, primer_label, primer_set_id) %>% 
+                      summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
+                                 pct_rev = sum(!is.na(rev_pos))/n()*100,
+                                 pct_amplicons = sum(!is.na(ampli_size))/n()*100, 
+                                 ampli_size_mean = case_when (pct_amplicons>0 ~ mean(ampli_size, na.rm=TRUE)),
+                                 ampli_size_sd = case_when (pct_amplicons>0 ~ sd(ampli_size, na.rm=TRUE)),
+                                 ampli_size_max = case_when (pct_amplicons>0 ~ max(ampli_size, na.rm=TRUE)),
+                                 ampli_size_min = case_when (pct_amplicons>0 ~ min(ampli_size, na.rm=TRUE)),
+                                 n_seq = n())  %>% 
+                      ungroup()
+ 
+
+  write_tsv( pr2_match_summary_primer_set_sg, str_c("output/pr2_match_summary_primer_set_",gene_selected,"_per_sg.tsv"), na="")
+  
+```
+
+## Summarize per class 
+
+```{r summary_class, warning=FALSE}
+
+  pr2_match_summary_primer_set_class <- pr2_match_final_filtered %>% 
+                      group_by(supergroup, division, class, gene_region, primer_label, primer_set_id) %>% 
+                      summarize (pct_fwd = sum(!is.na(fwd_pos))/n()*100,
+                                 pct_rev = sum(!is.na(rev_pos))/n()*100,
+                                 pct_amplicons = sum(!is.na(ampli_size))/n()*100, 
+                                 ampli_size_mean = case_when (pct_amplicons>0 ~ mean(ampli_size, na.rm=TRUE)),
+                                 ampli_size_sd = case_when (pct_amplicons>0 ~ sd(ampli_size, na.rm=TRUE)),
+                                 ampli_size_max = case_when (pct_amplicons>0 ~ max(ampli_size, na.rm=TRUE)),
+                                 ampli_size_min = case_when (pct_amplicons>0 ~ min(ampli_size, na.rm=TRUE)),
+                                 n_seq = n())  
+ 
+  write_tsv(pr2_match_summary_primer_set_class, str_c("output/pr2_match_summary_primer_set_",gene_selected,"_per_class.tsv"), na="")  
+  
+```
+
+
+# Amplicon length
+
+## Average size 
+
+```{r amplicon_length_average, fig.height=10, fig.width=15}
+
+  ggplot(pr2_match_final, aes(x= primer_label, y=ampli_size, group=primer_set_id)) + 
+    geom_boxplot(outlier.alpha = 0.3) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Primer set")
+
+```
+
+## Plot an example of amplicon distribution (Fig. 3)
+
+```{r amplicon_length_histogram, fig.height=6, fig.width=10}
+
+fig3A <- list()
+fig3B <- list()
+
+
+for (one_primer_set in c(4, 29)){
+  
+  if (one_primer_set == 4 ) {
+    xmin=570
+    xmax = 610
+    xmax2 = 2000
+  } else {
+    xmin=130
+    xmax = 190
+    xmax2 = 1000
+    
+  }
+  
+  pr2_match_final_one <- pr2_match_final %>% 
+    filter(primer_set_id==one_primer_set) %>% 
+    filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X", "Protoalveoalata") ))
+    
+  primer_label <- str_replace_all(pr2_match_final_one$primer_label[1], "_", " ")
+  
+  g <- ggplot(pr2_match_final_one, aes(x= ampli_size)) + 
+    geom_density(fill="blue", alpha=0.9) +
+    xlab("Amplicon size") +
+    ggtitle(str_c("Primer set - ", primer_label)) +
+    xlim(xmin,xmax)
+  
+  print(g)
+  
+  fig3A[[one_primer_set]] <- ggplot(pr2_match_final_one, aes(x= ampli_size, fill=supergroup)) + 
+    geom_density(alpha=0.9)+
+    theme_bw() +
+    theme(legend.position = "none") +
+    scale_fill_viridis_d(option = "inferno") +
+    xlab("Amplicon size (bp)") + ylab("Density") +
+    ggtitle(str_c("Primer set - ", primer_label)) +
+    xlim(xmin,xmax) 
+  
+  print(fig3A[[one_primer_set]])
+
+  fig3B[[one_primer_set]] <- ggplot(pr2_match_final_one, aes(x= supergroup, y=ampli_size)) + 
+    geom_boxplot(outlier.alpha = 0.3)+
+    theme_bw() +
+    coord_flip()+
+    # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Supergroup") + ylab("Amplicon size (bp)") +
+    ylim(0,xmax2)
+    
+  print(fig3B[[one_primer_set]])
+  
+  g <- ggplot(pr2_match_final_one, aes(x= supergroup, y=ampli_size)) + 
+    geom_violin() +
+    coord_flip()+
+    # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+    xlab("Supergroup") + ylab("Amplicon size (bp)") 
+  print(g)
+    
+}
+
+```
+
+## Plot an example of amplicon size distribution
+
+
+```{r graph_set_4, fig.height=10, fig.width=10}
+
+fig3C <- list()
+
+for (one_primer_set in c(4, 29)) {
+  
+  pr2_match_summary_filtered <- pr2_match_summary_primer_set_sg %>% 
+    filter((n_seq > 20) &
+           (primer_set_id == one_primer_set) & 
+           !(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
+  
+
+  
+ fig3C[[one_primer_set]] <- ggplot(pr2_match_summary_filtered) + 
+    geom_col(data=pr2_match_summary_filtered, 
+             aes(x=str_c(supergroup, " - n = ", n_seq), 
+                 y=pct_amplicons, 
+                 fill=supergroup),  
+                 position="dodge") +
+    theme_bw()+
+    theme(legend.position = "none") +
+    scale_fill_viridis_d(option = "inferno") +
+    coord_flip() + 
+    ylab("% of sequences amplified") + xlab("") # +
+    # ggtitle (str_c("Set - ", one_primer_set, " - % amplified per Supergroup") ) 
+
+  print(fig3C[[one_primer_set]])  
+  
+  g <- ggplot(filter(pr2_match_summary_filtered, !is.nan(ampli_size_mean))) + 
+    geom_point(aes(x=str_c(supergroup, " - n = ", n_seq), 
+                   y=ampli_size_mean), 
+               colour="black") +
+    coord_flip()  +
+    geom_errorbar(aes(x=str_c(supergroup, " - n = ", n_seq), 
+                      ymax=ampli_size_mean + ampli_size_sd, 
+                      ymin=ampli_size_mean - ampli_size_sd)) +
+    xlab("Supergroup") + ylab("Amplicon size (bp)")   # +
+    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+    # ggtitle (str_c("Set - ", one_primer_set, 
+    #                " - Amplicon sizes") )  +
+    # geom_hline(yintercept = c(450,550) , linetype= 2)
+
+  print(g)
+
+
+  
+
+}
+```
+
+## Fig. 3
+
+```{r,  fig.height=9, fig.width=18}
+
+# g.fig3A <- ggplotGrob(fig3A) # convert to gtable
+# g.fig3B <- ggplotGrob(fig3B) # convert to gtable
+# 
+# fig3A.widths <- g.fig3A$widths[1:3] # extract the first three widths, 
+#                                   # corresponding to left margin, y lab, and y axis
+# fig3B.widths <- g.fig3B$widths[1:3] # same for mpg plot
+# max.widths <- grid::unit.pmax(fig3A.widths, fig3B.widths) # calculate maximum widths
+# g.fig3A$widths[1:3] <- max.widths # assign max. widths to iris gtable
+# g.fig3B$widths[1:3] <- max.widths # assign max widths to mpg gtable
+
+cowplot::plot_grid(fig3A[[4]], fig3B[[4]], fig3C[[4]],fig3A[[29]], fig3B[[29]], fig3C[[29]], 
+                   labels = c("A","","", "B","",""), ncol = 3, nrow = 2, align = "h")
+
+```
+
+
+# Graphics
+
+## All Eukaryotes
+
+Comments
+
+* Percent of sequences amplified
+    * Logically, the % of seq amplified is always < min(% of sequences matching forwar, % of sequences matching reverse)
+    * In general it is the reverse primer that causes problems. 
+    * Some primer sets do not amplify any sequence (11, 19, 20, 21)
+    * For V9, primer set 30 reverse primer is in the ITS region which is not present in the PR2 sequences, so no amplification.
+    
+* Amplicon sizes
+    * Only 8 V4 primer sets are suitable for Illumina 2x250 (max amplicon size = 450 bp)
+    * This is if we consider the mean... If we consider the variation around the mean then, only 3 suitable for 2x250
+    * Five more V4 primer sets are suitable for Illumina 3x250 (max amplicon size = 550 bp)
+
+```{r graph_euks, fig.height=5, fig.width=12}
+
+for (one_region in gene_regions) {
+  
+  pr2_match_summary_primer_set_region_long <- filter(pr2_match_summary_primer_set_long, gene_region== one_region)  
+  pr2_match_summary_primer_set_region <- filter(pr2_match_summary_primer_set, gene_region== one_region)
+  pr2_match_region <- filter(pr2_match_final, gene_region == one_region)
+  
+  g <- ggplot(pr2_match_summary_primer_set_region_long) + 
+    geom_col(aes(x=reorder(primer_label, primer_set_id), y=pct_seq, 
+                 fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
+    theme_bw() +
+    xlab("Primer set") + ylab("% of sequences amplified") + 
+    scale_fill_manual(name = "% amplified",  values = c("pct_amplicons" = "black", "pct_fwd" = "blue","pct_rev" = "red"), 
+                      labels=c( "Primer fwd", "Primer rev", "Amplicons")) +
+    ggtitle (str_c(one_region, " - Percentage of sequences recovered"))+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  
+  print(g)
+
+
+   g <- ggplot(filter(pr2_match_summary_primer_set_region, !is.nan(ampli_size_mean))) + 
+    geom_point(aes(x=reorder(primer_label, primer_set_id), y=ampli_size_mean), colour="black") +
+    geom_errorbar(aes(x=reorder(primer_label, primer_set_id), 
+                      ymax=ampli_size_mean + ampli_size_sd, 
+                      ymin=ampli_size_mean - ampli_size_sd)) +
+    theme_bw() +
+    xlab("Primer set") + ylab("Amplicon size (bp)") +
+    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+    ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+    geom_hline(yintercept = c(450,550), linetype = c(2,3) )+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+   
+  print(g)
+  
+     g <- ggplot(pr2_match_region) + 
+    geom_boxplot(aes(x=reorder(primer_label, primer_set_id), y=ampli_size), colour="black", outlier.alpha = 0.3) +
+    theme_bw() +
+    xlab("Primer set") + ylab("Amplicon size (bp)") +
+    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+    ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+    geom_hline(yintercept = c(450,550), linetype = c(2,3) )+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+   
+  print(g)
+    }
+
+```
+
+
+## By supergroup
+
+Comments
+
+* Excavata have a very different patterns from the rest of the group. They are not amplified by quite a few primer sets. They have also bigger amplicons
+* Some groups exhibit higher variability in amplicon size (e.g Chlorophyta)
+
+```{r graph_supergroup, fig.height=30, fig.width=12}
+
+for (one_region in gene_regions) {
+  
+  pr2_match_summary_primer_set_sg_region <- filter(pr2_match_summary_primer_set_sg, 
+                                                   (gene_region == one_region) &(n_seq > 20)) 
+  
+  g <- ggplot(pr2_match_summary_primer_set_sg_region) + 
+    geom_col(aes(x=supergroup, 
+                 y=pct_amplicons),  
+             fill="grey", 
+             position="dodge") +
+    theme_bw() +
+    coord_flip() + 
+    ylab("% of sequences amplified") + 
+    xlab("Supergroup")  +
+    ggtitle (str_c(one_region, " - % amplified per Supergroup") ) +
+    facet_wrap(~ primer_label, scales ="fixed")
+
+  print(g)  
+  
+  g <- ggplot(filter(pr2_match_summary_primer_set_sg_region, !is.nan(ampli_size_mean))) + 
+    geom_point(aes(x=supergroup, 
+                   y=ampli_size_mean), 
+               colour="black") +
+    theme_bw() +
+    coord_flip()  +
+    geom_errorbar(aes(x=supergroup, 
+                      ymax=ampli_size_mean + ampli_size_sd, 
+                      ymin=ampli_size_mean - ampli_size_sd)) +
+    xlab("Supergroup") + 
+    ylab("Amplicon size (bp)")  +
+    ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+    geom_hline(yintercept = c(450,550) , linetype= 2) +
+    facet_wrap(~ primer_label, scales = "fixed")
+
+  print(g)
+
+
+
+}
+```
+
+
+## By class for autotrophs
+
+
+```{r graph_class, fig.height=25, fig.width=12}
+for (one_region in gene_regions) {
+
+  pr2_match_summary_filtered <- filter(pr2_match_summary_primer_set_class,
+                                      (n_seq > 20) &
+                                      (division %in% c("Haptophyta", "Dinoflagellata", 
+                                                       "Chlorophyta", "Ochrophyta", "Cryptophyta")) &
+                                      (gene_region == one_region))
+  
+  if(nrow(pr2_match_summary_filtered) > 0 ) {
+  
+  g <- ggplot(pr2_match_summary_filtered) + 
+    geom_col(data=pr2_match_summary_filtered, 
+             aes(x=str_c(str_trunc(division, 3, ellipsis = ""), "-", class), 
+                 y=pct_amplicons),  
+             fill="grey", position="dodge") +
+    theme_bw() +
+    coord_flip() + 
+    ylab("% of sequences amplified") + xlab("Class")  +
+    ggtitle (str_c("Set -", one_primer_set, " - % amplified per Class") )  +
+    facet_wrap(~ primer_label, scales ="fixed")
+
+  print(g)
+  
+g <- ggplot(filter(pr2_match_summary_filtered, !is.nan(ampli_size_mean))) + 
+    geom_point(aes(x=str_c(str_trunc(division, 3, ellipsis = ""), "-", class), 
+                   y=ampli_size_mean), 
+               colour="black") +
+    theme_bw() +
+    coord_flip()  +
+    geom_errorbar(aes(x=str_c(str_trunc(division, 3, ellipsis = ""), "-", class), 
+                      ymax=ampli_size_mean + ampli_size_sd, 
+                      ymin=ampli_size_mean - ampli_size_sd)) +
+    xlab("Class") + ylab("Amplicon size (bp)")  +
+    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+    ggtitle (str_c("Set -", one_primer_set, 
+                   " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+    geom_hline(yintercept = c(450,550) , linetype= 2) +
+    facet_wrap(~ primer_label, scales ="fixed")
+
+  print(g)
+  }
+}
+```
+
+
+# Specific analyses
+
+## Specific et sets for Opisthokonta
+* 35 UnNonMet
+* 16 Piredda
+* 17 Comeau
+
+```{r graph_set_35, fig.height=10, fig.width=10}
+
+
+for (one_primer_set in c(16, 17, 35)) {
+  
+  pr2_match_summary_filtered <- filter(pr2_match_summary_primer_set_class,
+                                      (n_seq > 20) &
+                                      (supergroup %in% c("Opisthokonta")) &
+                                      (primer_set_id == one_primer_set))
+  
+  g <- ggplot(pr2_match_summary_filtered) + 
+    geom_col(data=pr2_match_summary_filtered, 
+             aes(x=str_c(division, "-", class, " - n= ", n_seq), 
+                 y=pct_amplicons),  
+             fill="grey", position="dodge") +
+    theme_bw() +
+    coord_flip() + 
+    ylab("% of sequences amplified") + xlab("Class")  +
+    ggtitle (str_c("Set -", one_primer_set, " - % amplified per Class") ) 
+
+  print(g)  
+  
+  g <- ggplot(filter(pr2_match_summary_filtered, !is.nan(ampli_size_mean))) + 
+    geom_point(aes(x=str_c(division, "-", class, " - n= ", n_seq), 
+                   y=ampli_size_mean), 
+               colour="black") +
+    coord_flip()  +
+    geom_errorbar(aes(x=str_c(division, "-", class, " - n= ", n_seq), 
+                      ymax=ampli_size_mean + ampli_size_sd, 
+                      ymin=ampli_size_mean - ampli_size_sd)) +
+    xlab("Class") + ylab("Amplicon size (bp)")  +
+    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+    ggtitle (str_c("Set -", one_primer_set, 
+                   " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+    geom_hline(yintercept = c(450,550) , linetype= 2)
+
+  print(g)
+
+}
+```
+
