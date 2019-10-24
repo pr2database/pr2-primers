@@ -146,11 +146,11 @@ disconnect <- db_disconnect(pr2_db_con)
 
 if(gene_selected == "18S_rRNA") {
   gene_regions = c("V4", "V9")
-  # Just keep the selected primers (V4, V9 etc..)
+  # Just keep the selected primers (V4, V9 etc..) - Remove unpublished primers
   primer_sets <- primer_sets_all %>% 
   filter(gene == gene_selected) %>% 
   filter(gene_region %in%  gene_regions) %>% 
-  filter(!(primer_set_id %in% 63:66))
+  filter(!(primer_set_id %in% c(12, 22, 26, 63:66, 77, 83))) 
   } else{
   primer_sets <- primer_sets %>% 
   filter(specificity ==  "plastid" | (gene == "18S_rRNA" & specificity == "universal" ))
@@ -172,10 +172,11 @@ primer_sets <- primer_sets %>%
                  rev_end_yeast= end_yeast), 
           by = c("rev_id" = "primer_id")) %>% 
   mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
-  select(gene_region, specificity, primer_set_id,primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark) %>% 
+  select(gene_region, specificity, primer_set_id,primer_set_name, contains("fwd"), contains("rev"),length_yeast, used_in:remark) %>%
+  select(-fwd_id, -rev_id) %>% 
   arrange(gene_region,  fwd_start_yeast)
 
-write_tsv(primer_sets, path = "output/primers_Table_1.tsv", na = "")
+# write_tsv(primer_sets, path = "output/primers_Table_1.tsv", na = "")
 
 
 
@@ -225,7 +226,11 @@ All sequences for which introns have been removed are filtered out (contain "_UC
     # Remove sequence that are shorter
       filter((gene_region == "V4" & sequence_length>= sequence_length_min_V4) |
              (gene_region == "V9" & sequence_length>= sequence_length_min_V9) |
-             (! (gene_region %in% c("V4", "V9") & sequence_length>= sequence_length_min)))
+             (! (gene_region %in% c("V4", "V9") & sequence_length>= sequence_length_min))) %>% 
+    # remove "_" from primer_labels
+      mutate(primer_label = str_replace_all(primer_label, "_", " ")) %>% 
+    # Only keep the selected primers
+      filter(primer_set_id %in% primer_sets$primer_set_id) 
     
 
   print(str_c("After filtration: ", nrow(pr2_match_final_filtered)))
@@ -256,12 +261,12 @@ All sequences for which introns have been removed are filtered out (contain "_UC
                                  ampli_size_min = min(ampli_size, na.rm=TRUE),
                                  n_seq = n())  
  
-  write_tsv(pr2_match_summary_primer_set, str_c("output/pr2_match_summary_primer_set_",gene_selected,".tsv"), na="")
+  # write_tsv(pr2_match_summary_primer_set, str_c("output/pr2_match_summary_primer_set_",gene_selected,".tsv"), na="")
   
 # Long form for Number of sequences
   
   # This dataframe is used to re-order the bars correctly
-  pct_category_order <- data.frame(pct_category = c("pct_amplicons","pct_fwd","pct_rev"), pct_category_order = c(3, 1, 2))
+  pct_category_order <- data.frame(pct_category = c("pct_amplicons","pct_fwd","pct_rev"), pct_category_order = c(1, 3, 2))
   
   pr2_match_summary_primer_set_long <- pr2_match_summary_primer_set %>% 
     tidyr::gather("pct_category", "pct_seq", pct_fwd:pct_amplicons) %>% 
@@ -287,7 +292,7 @@ All sequences for which introns have been removed are filtered out (contain "_UC
                       ungroup()
  
 
-  write_tsv( pr2_match_summary_primer_set_sg, str_c("output/pr2_match_summary_primer_set_",gene_selected,"_per_sg.tsv"), na="")
+  # write_tsv( pr2_match_summary_primer_set_sg, str_c("output/pr2_match_summary_primer_set_",gene_selected,"_per_sg.tsv"), na="")
   
 ```
 
@@ -306,10 +311,9 @@ All sequences for which introns have been removed are filtered out (contain "_UC
                                  ampli_size_min = case_when (pct_amplicons>0 ~ min(ampli_size, na.rm=TRUE)),
                                  n_seq = n())  
  
-  write_tsv(pr2_match_summary_primer_set_class, str_c("output/pr2_match_summary_primer_set_",gene_selected,"_per_class.tsv"), na="")  
+  # write_tsv(pr2_match_summary_primer_set_class, str_c("output/pr2_match_summary_primer_set_",gene_selected,"_per_class.tsv"), na="")  
   
 ```
-
 
 # Amplicon length
 
@@ -444,25 +448,6 @@ for (one_primer_set in c(4, 29)) {
 }
 ```
 
-## Fig. 3
-
-```{r,  fig.height=9, fig.width=18}
-
-# g.fig3A <- ggplotGrob(fig3A) # convert to gtable
-# g.fig3B <- ggplotGrob(fig3B) # convert to gtable
-# 
-# fig3A.widths <- g.fig3A$widths[1:3] # extract the first three widths, 
-#                                   # corresponding to left margin, y lab, and y axis
-# fig3B.widths <- g.fig3B$widths[1:3] # same for mpg plot
-# max.widths <- grid::unit.pmax(fig3A.widths, fig3B.widths) # calculate maximum widths
-# g.fig3A$widths[1:3] <- max.widths # assign max. widths to iris gtable
-# g.fig3B$widths[1:3] <- max.widths # assign max widths to mpg gtable
-
-cowplot::plot_grid(fig3A[[4]], fig3B[[4]], fig3C[[4]],fig3A[[29]], fig3B[[29]], fig3C[[29]], 
-                   labels = c("A","","", "B","",""), ncol = 3, nrow = 2, align = "h")
-
-```
-
 
 # Graphics
 
@@ -481,29 +466,50 @@ Comments
     * This is if we consider the mean... If we consider the variation around the mean then, only 3 suitable for 2x250
     * Five more V4 primer sets are suitable for Illumina 3x250 (max amplicon size = 550 bp)
 
-```{r graph_euks, fig.height=5, fig.width=12}
+```{r graph_euks, fig.height=10, fig.width=6}
+
+
+
+fig1 <- list()
 
 for (one_region in gene_regions) {
   
-  pr2_match_summary_primer_set_region_long <- filter(pr2_match_summary_primer_set_long, gene_region== one_region)  
-  pr2_match_summary_primer_set_region <- filter(pr2_match_summary_primer_set, gene_region== one_region)
-  pr2_match_region <- filter(pr2_match_final, gene_region == one_region)
+  pr2_match_summary_primer_set_region_long <- pr2_match_summary_primer_set_long %>% 
+    filter(gene_region== one_region) %>% 
+    # Remove the group specific primers
+      filter(!(primer_set_id %in% c(35, 19, 39, 21, 41)))  
+  
+  pr2_match_summary_primer_set_region <- pr2_match_summary_primer_set %>% 
+    filter(gene_region== one_region) %>% 
+    # Remove the group specific primers)
+      filter(!(primer_set_id %in% c(35, 19, 39, 21, 41)))  
+  
+  pr2_match_region <- pr2_match_final %>% 
+    filter(gene_region == one_region)%>% 
+    # Remove the group specific primers
+      filter(!(primer_set_id %in% c(35, 19, 39, 21, 41)))  
   
   g <- ggplot(pr2_match_summary_primer_set_region_long) + 
-    geom_col(aes(x=reorder(primer_label, primer_set_id), y=pct_seq, 
+    geom_col(aes(x=reorder(primer_label, -primer_set_id), y=pct_seq, 
                  fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
     theme_bw() +
     xlab("Primer set") + ylab("% of sequences amplified") + 
-    scale_fill_manual(name = "% amplified",  values = c("pct_amplicons" = "black", "pct_fwd" = "blue","pct_rev" = "red"), 
-                      labels=c( "Primer fwd", "Primer rev", "Amplicons")) +
+    scale_fill_manual(name = "",  values = c("pct_amplicons" = "black", "pct_fwd" = "grey80","pct_rev" = "grey40"), 
+                      labels=c( "Amplicons", "Primer rev", "Primer fwd")) +
     ggtitle (str_c(one_region, " - Percentage of sequences recovered"))+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+    ylim(0,100) +
+    coord_flip() + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "top", legend.box = "horizontal")
   
   print(g)
+  
+  fig1[[str_c(one_region, "pct", sep = " ")]] <- g
 
 
    g <- ggplot(filter(pr2_match_summary_primer_set_region, !is.nan(ampli_size_mean))) + 
-    geom_point(aes(x=reorder(primer_label, primer_set_id), y=ampli_size_mean), colour="black") +
+    geom_point(aes(x=reorder(primer_label, -primer_set_id), y=ampli_size_mean), colour="black") +
     geom_errorbar(aes(x=reorder(primer_label, primer_set_id), 
                       ymax=ampli_size_mean + ampli_size_sd, 
                       ymin=ampli_size_mean - ampli_size_sd)) +
@@ -511,21 +517,25 @@ for (one_region in gene_regions) {
     xlab("Primer set") + ylab("Amplicon size (bp)") +
     # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
     ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
-    geom_hline(yintercept = c(450,550), linetype = c(2,3) )+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+    geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
+    ylim(0,850) + 
+    theme(axis.text.x = element_text(angle = 0, hjust = 1)) + 
+    coord_flip()  
    
   print(g)
+   
+  fig1[[str_c(one_region, "size", sep = " ")]] <- g
   
-     g <- ggplot(pr2_match_region) + 
-    geom_boxplot(aes(x=reorder(primer_label, primer_set_id), y=ampli_size), colour="black", outlier.alpha = 0.3) +
-    theme_bw() +
-    xlab("Primer set") + ylab("Amplicon size (bp)") +
-    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
-    ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
-    geom_hline(yintercept = c(450,550), linetype = c(2,3) )+
-    theme(axis.text.x = element_text(angle = 45, hjust = 1))
-   
-  print(g)
+  #    g <- ggplot(pr2_match_region) + 
+  #   geom_boxplot(aes(x=reorder(primer_label, primer_set_id), y=ampli_size), colour="black", outlier.alpha = 0.3) +
+  #   theme_bw() +
+  #   xlab("Primer set") + ylab("Amplicon size (bp)") +
+  #   # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+  #   ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+  #   geom_hline(yintercept = c(450,550), linetype = c(2,3) )+
+  #   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+  #  
+  # print(g)
     }
 
 ```
@@ -538,26 +548,55 @@ Comments
 * Excavata have a very different patterns from the rest of the group. They are not amplified by quite a few primer sets. They have also bigger amplicons
 * Some groups exhibit higher variability in amplicon size (e.g Chlorophyta)
 
-```{r graph_supergroup, fig.height=30, fig.width=12}
+```{r graph_supergroup, fig.height=20, fig.width=12}
+
+fig_supergroup <- list()
+
+specific_set <- TRUE
 
 for (one_region in gene_regions) {
   
-  pr2_match_summary_primer_set_sg_region <- filter(pr2_match_summary_primer_set_sg, 
-                                                   (gene_region == one_region) &(n_seq > 20)) 
+  pr2_match_summary_primer_set_sg_region <- pr2_match_summary_primer_set_sg %>% 
+    filter((gene_region == one_region) &(n_seq > 20) ) %>% 
+    filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
+  nrow = 5
+  
+  if(specific_set) {
+    pr2_match_summary_primer_set_sg_region <- pr2_match_summary_primer_set_sg %>% 
+      filter((n_seq > 20) ) %>% 
+      filter((primer_set_id %in% c(6, 13, 34, 25, 33, 16)) ) %>% 
+      filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
+    nrow = 1
+    }
+                                            
   
   g <- ggplot(pr2_match_summary_primer_set_sg_region) + 
     geom_col(aes(x=supergroup, 
-                 y=pct_amplicons),  
-             fill="grey", 
+                 y=pct_amplicons,
+                 fill= supergroup),  
              position="dodge") +
     theme_bw() +
     coord_flip() + 
     ylab("% of sequences amplified") + 
     xlab("Supergroup")  +
-    ggtitle (str_c(one_region, " - % amplified per Supergroup") ) +
-    facet_wrap(~ primer_label, scales ="fixed")
+    # ggtitle (str_c(one_region, " - % amplified per Supergroup") ) +
+    scale_fill_viridis_d(option = "inferno") +
+    ylim(0,100) +
+    facet_wrap(~ primer_label, scales ="fixed", nrow = nrow) + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "top", legend.box = "horizontal")+ 
+    theme(legend.position="none")
 
-  print(g)  
+  print(g)
+  
+  list_label <- str_c(one_region, "pct", 
+                        case_when(specific_set ~ "specific",
+                                  TRUE ~ ""),
+                        sep = " ")
+
+  fig_supergroup[[list_label]] <- g
+
+  
   
   g <- ggplot(filter(pr2_match_summary_primer_set_sg_region, !is.nan(ampli_size_mean))) + 
     geom_point(aes(x=supergroup, 
@@ -570,13 +609,18 @@ for (one_region in gene_regions) {
                       ymin=ampli_size_mean - ampli_size_sd)) +
     xlab("Supergroup") + 
     ylab("Amplicon size (bp)")  +
-    ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
+    # ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
     geom_hline(yintercept = c(450,550) , linetype= 2) +
-    facet_wrap(~ primer_label, scales = "fixed")
+    facet_wrap(~ primer_label, scales = "fixed", nrow = nrow)
 
   print(g)
+  
+  list_label <- str_c(one_region, "size", 
+                        case_when(specific_set ~ "specific",
+                                  TRUE ~ ""),
+                        sep = " ")
 
-
+  fig_supergroup[[list_label]] <- g
 
 }
 ```
@@ -586,28 +630,56 @@ for (one_region in gene_regions) {
 
 
 ```{r graph_class, fig.height=25, fig.width=12}
+
+fig_class <- list()
+
+specific_set <- TRUE
+
 for (one_region in gene_regions) {
 
   pr2_match_summary_filtered <- filter(pr2_match_summary_primer_set_class,
                                       (n_seq > 20) &
                                       (division %in% c("Haptophyta", "Dinoflagellata", 
                                                        "Chlorophyta", "Ochrophyta", "Cryptophyta")) &
-                                      (gene_region == one_region))
+                                      (gene_region == one_region)) 
+  nrow = 5
+  
+    if(specific_set) {
+  pr2_match_summary_filtered <- filter(pr2_match_summary_primer_set_class,
+                                      (n_seq > 20) &
+                                      (division %in% c("Haptophyta", "Dinoflagellata", 
+                                                       "Chlorophyta", "Ochrophyta", "Cryptophyta")) &
+                                      (gene_region == one_region))  %>% 
+                                       filter((primer_set_id %in% c(16, 21)) ) 
+    nrow = 1
+    }
   
   if(nrow(pr2_match_summary_filtered) > 0 ) {
   
   g <- ggplot(pr2_match_summary_filtered) + 
     geom_col(data=pr2_match_summary_filtered, 
-             aes(x=str_c(str_trunc(division, 3, ellipsis = ""), "-", class), 
-                 y=pct_amplicons),  
-             fill="grey", position="dodge") +
+             aes(x=str_c(str_trunc(division, 20, ellipsis = ""), "-", class), 
+                 y=pct_amplicons, 
+                 fill = class), 
+             position="dodge") +
     theme_bw() +
     coord_flip() + 
     ylab("% of sequences amplified") + xlab("Class")  +
-    ggtitle (str_c("Set -", one_primer_set, " - % amplified per Class") )  +
-    facet_wrap(~ primer_label, scales ="fixed")
+    scale_fill_viridis_d(option = "inferno") +
+    ylim(0,100) +
+    facet_wrap(~ primer_label, scales ="fixed", nrow = nrow) + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "top", legend.box = "horizontal")+ 
+    theme(legend.position="none")
 
   print(g)
+  
+  list_label <- str_c(one_region, "pct", 
+                        case_when(specific_set ~ "specific",
+                                  TRUE ~ ""),
+                        sep = " ")
+
+  fig_class[[list_label]] <- g
   
 g <- ggplot(filter(pr2_match_summary_filtered, !is.nan(ampli_size_mean))) + 
     geom_point(aes(x=str_c(str_trunc(division, 3, ellipsis = ""), "-", class), 
@@ -623,7 +695,7 @@ g <- ggplot(filter(pr2_match_summary_filtered, !is.nan(ampli_size_mean))) +
     ggtitle (str_c("Set -", one_primer_set, 
                    " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
     geom_hline(yintercept = c(450,550) , linetype= 2) +
-    facet_wrap(~ primer_label, scales ="fixed")
+    facet_wrap(~ primer_label, scales ="fixed", nrow = nrow)
 
   print(g)
   }
@@ -679,3 +751,123 @@ for (one_primer_set in c(16, 17, 35)) {
 }
 ```
 
+# Tables
+
+## Table 1 and Supplementary tables
+
+```{r, eval=FALSE}
+  if(gene_selected == "18S_rRNA") file_name_xls = "output/primers_18S.xlsx"
+
+  excel_style  <- openxlsx::createStyle(numFmt = "0.00")
+  openxlsx::write.xlsx(list(primer_sets, 
+                            pr2_match_summary_primer_set, 
+                            pr2_match_summary_primer_set_sg, 
+                            pr2_match_summary_primer_set_class),
+                       file = file_name_xls,
+                       sheetName = c("Table 1", "Summary Eukaryotes", "Summary Supergroup", "Summary Class"),
+                       zoom = 80,
+                       firstActiveRow=2,firstActiveRow=6,
+                       colWidths = "auto")
+```
+
+
+# Figures
+
+## Fig. 1 - V4 and V9 - Amplification % and size
+
+```{r,  fig.height=12, fig.width=12}
+
+
+legend <- cowplot::get_legend( fig1[["V4 pct"]] + 
+                      # create some space to the left of the legend    
+                      theme(legend.box.margin = margin(0, 0, 0, 20))
+                    )
+
+fig_1 <- cowplot::plot_grid(legend, NULL,
+                            fig1[["V4 pct"]]  +ggtitle("")+ theme(legend.position="none") + ylab(""), 
+                            fig1[["V4 size"]] +ggtitle("") + xlab("") + ylab(""),
+                            fig1[["V9 pct"]]  +ggtitle("")+ theme(legend.position="none"), 
+                            fig1[["V9 size"]] +ggtitle("") + xlab(""), 
+                   labels = c("","","","A", "","B"), label_size = 22, label_x = 0.95,vjust=-0.15,
+                   ncol = 2, nrow = 3, align = "hv", rel_heights = c(1,20,6) )
+fig_1
+
+ggsave(plot= fig_1 , filename="figs/fig_1_pct_sizes_V4_V9.pdf",
+           width = 12 , height = 12, scale=2.5, units="cm", useDingbats=FALSE)
+
+
+
+```
+
+
+
+## Fig. 2 - Example of V4 and V9
+
+```{r,  fig.height=9, fig.width=18}
+
+# g.fig3A <- ggplotGrob(fig3A) # convert to gtable
+# g.fig3B <- ggplotGrob(fig3B) # convert to gtable
+# 
+# fig3A.widths <- g.fig3A$widths[1:3] # extract the first three widths, 
+#                                   # corresponding to left margin, y lab, and y axis
+# fig3B.widths <- g.fig3B$widths[1:3] # same for mpg plot
+# max.widths <- grid::unit.pmax(fig3A.widths, fig3B.widths) # calculate maximum widths
+# g.fig3A$widths[1:3] <- max.widths # assign max. widths to iris gtable
+# g.fig3B$widths[1:3] <- max.widths # assign max widths to mpg gtable
+
+fig_2 <- cowplot::plot_grid(fig3A[[4]], fig3B[[4]], fig3C[[4]],fig3A[[29]], fig3B[[29]], fig3C[[29]], 
+                   labels = c("A","","", "B","",""), ncol = 3, nrow = 2, align = "h" )
+
+fig_2
+
+ggsave(plot= fig_2 , filename="figs/fig_2_examples_V4_V9.pdf",
+           width = 13 , height = 7, scale=3.0, units="cm", useDingbats=FALSE)
+
+
+
+```
+
+
+
+## Fig. 3 - Supergroup analysis
+
+```{r,  fig.height=9, fig.width=9}
+
+# g.fig3A <- ggplotGrob(fig3A) # convert to gtable
+# g.fig3B <- ggplotGrob(fig3B) # convert to gtable
+# 
+# fig3A.widths <- g.fig3A$widths[1:3] # extract the first three widths, 
+#                                   # corresponding to left margin, y lab, and y axis
+# fig3B.widths <- g.fig3B$widths[1:3] # same for mpg plot
+# max.widths <- grid::unit.pmax(fig3A.widths, fig3B.widths) # calculate maximum widths
+# g.fig3A$widths[1:3] <- max.widths # assign max. widths to iris gtable
+# g.fig3B$widths[1:3] <- max.widths # assign max widths to mpg gtable
+
+fig_3 <- cowplot::plot_grid(fig_supergroup[["V4 pct specific"]], fig_supergroup[["V4 size specific"]], 
+                   labels = c("A", "B"), ncol = 1, nrow = 2, align = "v" )
+
+fig_3
+
+ggsave(plot= fig_3 , filename="figs/fig_3_supergroup.pdf",
+           width = 13 , height = 7, scale=2.5, units="cm", useDingbats=FALSE)
+
+
+
+```
+
+## Fig. 4 - Class analysis
+
+```{r,  fig.height=9, fig.width=9}
+
+
+fig_4 <- cowplot::plot_grid(fig_class[["V4 pct specific"]], 
+                   ncol = 1, nrow = 1, align = "v" )
+
+fig_4
+
+ggsave(plot= fig_4 , filename="figs/fig_4_class.pdf",
+           width = 7 , height = 5, scale=3, units="cm", useDingbats=FALSE)
+
+
+
+```
