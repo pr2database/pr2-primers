@@ -13,7 +13,7 @@ The pr2-primers database hosts list of 18S rRNA primers, primer-sets and in sili
 * Enrique Lara: <enrique.lara@rjb.csic.es>
 
 # Citation
-Geisen S., Vaulot D., Mahé F., Lara E., de Vargas C., Bass D. 2019. A user guide to environmental protistology: primers, metabarcoding, sequencing, and analyses. Molecular Ecology Resources submitted. [deposited to BioRxiv](https://www.biorxiv.org/content/10.1101/850610v1)
+Geisen S., Vaulot D., Mahé F., Lara E., de Vargas C., Bass D. 2019. A user guide to environmental protistology: primers, metabarcoding, sequencing, and analyses. Molecular Ecology Resources submitted, [deposited to BioRxiv](https://www.biorxiv.org/content/10.1101/850610v1).
 
 # Issues and contributions
 Please report all issues or un-listed primers [here](https://github.com/pr2database/pr2-primers/issues)
