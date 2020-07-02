@@ -1,5 +1,5 @@
 library(shiny)
-library(DT)
+# library(DT)
 
 
 primers<- readRDS("primers.rds")
@@ -10,7 +10,7 @@ ui <- fluidPage(
   title = "Primer database",
   titlePanel("Primer database"),
   sidebarLayout(
-    sidebarPanel(width = 3,
+    sidebarPanel(width = 2,
       conditionalPanel(
         'input.dataset === "Primers"',
         checkboxGroupInput("show_vars_table1", "Columns to show:",
@@ -24,9 +24,9 @@ ui <- fluidPage(
     ),
     mainPanel(
       tabsetPanel(
-        id = 'dataset',
-        tabPanel("Primers", DT::dataTableOutput("mytable1")),
-        tabPanel("Primer sets", DT::dataTableOutput("mytable2"))
+        id = 'dataset' ,
+        tabPanel("Primers", dataTableOutput("mytable1")),
+        tabPanel("Primer sets", dataTableOutput("mytable2"))
       )
     )
   )
@@ -35,13 +35,13 @@ ui <- fluidPage(
 server <- function(input, output) {
 
   # choose columns to display
-  output$mytable1 <- DT::renderDataTable({
-    DT::datatable(primers[, input$show_vars_table1, drop = FALSE])
+  output$mytable1 <- renderDataTable({
+    primers[, input$show_vars_table1, drop = FALSE]
   })
 
   # choose columns to display
-  output$mytable2 <- DT::renderDataTable({
-    DT::datatable(primer_sets[, input$show_vars_table2, drop = FALSE])
+  output$mytable2 <- renderDataTable({
+    primer_sets[, input$show_vars_table2, drop = FALSE]
   })
 
 
