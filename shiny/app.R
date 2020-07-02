@@ -1,14 +1,19 @@
 library(shiny)
+library(dplyr)
+library(stringr)
 # library(DT)
 
 
-primers<- readRDS("primers.rds")
-primer_sets<- readRDS("primer_sets.rds") 
+primers<- readRDS("primers.rds") %>% 
+  filter(str_detect(gene, "rRNA"))
+  
+primer_sets<- readRDS("primer_sets.rds") %>% 
+  filter(str_detect(gene, "rRNA"))
 
 
 ui <- fluidPage(
-  title = "Primer database",
-  titlePanel("Primer database"),
+  title = "Primer databases",
+  titlePanel("Primer database for protis rRNA genes"),
   sidebarLayout(
     sidebarPanel(width = 2,
       conditionalPanel(
