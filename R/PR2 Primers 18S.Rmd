@@ -20,13 +20,6 @@ output:
     number_sections : yes    
 ---
 
-```{r eval=FALSE, echo=FALSE, message=FALSE}
-# Use this command to render the file
-rmarkdown::render('PR2 Primers 18S.Rmd', 
-                  output_file = '../docs/PR2_Primers.html', 
-                  output_format="rmdformats::readthedown")
-```
-
 # Goal
 * Display primer set matches against the PR2 database (latest version 4.12.0)
 
@@ -105,7 +98,7 @@ gene_selected = "18S_rRNA"  # Can be 18S_rRNA or 16_rRNA
 rda_file_label = "_all"  # This label is added at the end of the rda file name
 gene_regions = c("V4", "V9")
 
-primer_sets_excluded = c(73, 74) # These primers should not be included (semi nested PCR)
+# primer_sets_excluded = c(73, 74) # These primers should not be included (semi nested PCR)
 
 sequence_length_min = 1500
 sequence_length_min_V9 = 1650 
@@ -137,8 +130,9 @@ if(gene_selected == "18S_rRNA") {
   primer_sets <- primer_sets_all %>% 
     filter(gene == "18S rRNA",
            !is.na(reference_doi) ,
-           !str_detect(gene_region,"ITS|cloning|full"),
-            str_detect(gene_region,"^V")) # Start with V
+           !str_detect(gene_region,"ITS|cloning|full")
+            # str_detect(gene_region,"^V") # Start with V
+          )
     
   
   gene_regions_all = unique(primer_sets$gene_region)
@@ -173,7 +167,7 @@ primer_sets <- primer_sets %>%
          reference:remark) %>%
   select(-fwd_id, -rev_id) %>% 
   arrange(gene_region,  fwd_start_yeast, rev_start_yeast) %>% 
-  filter(! (primer_set_id %in% primer_sets_excluded )) %>% 
+  # filter(! (primer_set_id %in% primer_sets_excluded )) %>% 
   mutate(specific = ifelse(is.na(specificity), "general", "specific")) %>% 
   relocate(specific, .before = specificity)
   
@@ -231,7 +225,7 @@ All sequences for which introns have been removed are filtered out (contain "_UC
   for (i in 1:nrow(primer_sets)) {
     cat("i = ", i, "\n")
     rda_file_label <- str_c(sprintf("_set_%03d", primer_sets$primer_set_id[i]), "_mismatches_", max_mismatch)
-    load(file=str_c("../output/individual primers/pr2_match_", gene_selected ,rda_file_label, ".rda"))
+    load(file=str_c("../shiny/data/individual primers/pr2_match_", gene_selected ,rda_file_label, ".rda"))
     pr2_match_list[[i]] <- pr2_match
   }
 
@@ -253,15 +247,20 @@ All sequences for which introns have been removed are filtered out (contain "_UC
 
   print(str_c("Before filtration: ", nrow(pr2_match_final)))
 
-# Replace the gene_region and primer_label since they can be changed in the database
-  primer_sets_label <- primer_sets %>% 
-    mutate(primer_label = str_c(str_sub(gene_region,1,2), 
+# Replace the gene_region and primer_label_short since they can be changed in the database
+  primer_sets_labels <- primer_sets %>% 
+    mutate(primer_set_label_short = str_c(str_sub(gene_region,1,2), 
                       sprintf("%02d", primer_set_id), 
                       str_sub(str_replace_na(specificity, replacement = ""),1,3),
-                      sep="_")) %>% 
+                      sep=" "),
+           primer_set_label_long = str_c(gene_region, 
+                                         primer_set_name, "-", 
+                                         str_replace_na(specificity, "general"), 
+                                         sep = " ")
+           ) %>% 
     # Remove the last underscore if left by itself
-    mutate(primer_label = str_replace(primer_label, "_$", "")) %>% 
-    select(primer_set_id, primer_label, gene_region, specific, specificity) 
+    mutate(primer_set_label_short = str_replace(primer_set_label_short, " $", "")) %>% 
+    select(primer_set_id, primer_set_label_short, gene_region, specific, specificity) 
   
   pr2_match_final <- pr2_match_final %>% 
     # Remove sequences for which the introns have been removed
@@ -270,17 +269,17 @@ All sequences for which introns have been removed are filtered out (contain "_UC
       filter((str_detect(gene_region, "V4") & sequence_length>= sequence_length_min_V4) |
              (str_detect(gene_region, "V9") & sequence_length>= sequence_length_min_V9) |
              (! str_detect(gene_region, "V4|V9") & sequence_length>= sequence_length_min)) %>% 
-    # remove "_" from primer_labels
-      mutate(primer_label = str_replace_all(primer_label, "_", " "),
-             mismatch_number = fwd_mismatch_number + rev_mismatch_number) %>% 
+    # remove "_" from primer_set_labels
+      mutate(mismatch_number = fwd_mismatch_number + rev_mismatch_number) %>% 
     # Only keep the selected primers
       filter(primer_set_id %in% primer_sets$primer_set_id) %>%
-    # Remove primer_label which is created in the line
-      select(-primer_label, -gene_region) %>% 
-      left_join(primer_sets_label)
+      select(-gene_region) %>% 
+      left_join(primer_sets_labels)
   
   print(str_c("After filtration: ", nrow(pr2_match_final)))
   
+saveRDS(pr2_match_final,
+        file=str_c("../shiny/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_filtered.rds"))
 
 ```
 
@@ -292,20 +291,20 @@ All sequences for which introns have been removed are filtered out (contain "_UC
 
 primer_summary <- function(pr2_match, taxo_level){
   summary <-  pr2_match  %>% 
-    group_by({{taxo_level}}, gene_region, primer_label, primer_set_id, specific, specificity ) %>% 
+    group_by({{taxo_level}}, gene_region, primer_set_label_long, primer_set_id, specific, specificity ) %>% 
     summarize (n_seq = n(),
                fwd_number = sum(!is.na(fwd_pos)),
                fwd_pct = fwd_number/n_seq*100, 
                fwd_mismatch_0_pct = sum(fwd_mismatch_number==0, na.rm = TRUE)/fwd_number*100,
                fwd_mismatch_1_pct = sum(fwd_mismatch_number==1, na.rm = TRUE)/fwd_number*100,
                fwd_mismatch_2_pct = sum(fwd_mismatch_number==2, na.rm = TRUE)/fwd_number*100,
-               fwd_mismatch_pos = mean(fwd_mismatch_primer_position_3prime, na.rm=TRUE),
+               fwd_mismatch_pos = mean(fwd_mismatch_primer_position_5prime, na.rm=TRUE),
                rev_number = sum(!is.na(rev_pos)),
                rev_pct = rev_number/n_seq*100,
                rev_mismatch_0_pct = sum(rev_mismatch_number==0, na.rm = TRUE)/rev_number*100,
                rev_mismatch_1_pct = sum(rev_mismatch_number==1, na.rm = TRUE)/rev_number*100,
                rev_mismatch_2_pct = sum(rev_mismatch_number==2, na.rm = TRUE)/rev_number*100,
-               rev_mismatch_pos = mean(rev_mismatch_primer_position_3prime, na.rm=TRUE),
+               rev_mismatch_pos = mean(rev_mismatch_primer_position_5prime, na.rm=TRUE),
                ampli_number = sum(!is.na(ampli_size)),
                ampli_pct = ampli_number/n_seq*100, 
                ampli_size_mean = mean(ampli_size, na.rm=TRUE),
@@ -325,7 +324,7 @@ primer_summary <- function(pr2_match, taxo_level){
 # Compute the position of the primer for nearly complete sequences
 summary_pos <-  pr2_match  %>% 
     filter(sequence_length>= sequence_length_min_V9) %>% 
-    group_by({{taxo_level}}, gene_region, primer_label, primer_set_id ) %>% 
+    group_by({{taxo_level}}, gene_region, primer_set_label_long, primer_set_id ) %>% 
     summarize (fwd_pos_mean = mean(fwd_pos, na.rm=TRUE),
                rev_pos_mean = mean(rev_pos, na.rm=TRUE)) %>% 
     ungroup()
@@ -422,7 +421,7 @@ fig3 <- list()
 ```{r amplicon_length, fig.height=10, fig.width=15}
 
  ggplot(pr2_match_final,
-        aes(x = primer_label,
+        aes(x = primer_set_label_short,
             y = ampli_size,
             group = primer_set_id,
             color = as.factor(mismatch_number)
@@ -443,7 +442,7 @@ fig3 <- list()
 ggplot(
   pr2_match_final,
   aes(
-    x = primer_label,
+    x = primer_set_label_short,
     y = ampli_size,
     group = primer_set_id,
     fill = as.factor(mismatch_number)
@@ -480,12 +479,10 @@ for (one_primer_set in c(4, 29)){
     filter(primer_set_id==one_primer_set) %>% 
     filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X", "Protoalveoalata") ))
     
-  primer_label <- str_replace_all(pr2_match_final_one$primer_label[1], "_", " ")
-  
   g <- ggplot(pr2_match_final_one, aes(x= ampli_size)) + 
     geom_density(fill="blue", alpha=0.9) +
     xlab("Amplicon size") +
-    ggtitle(str_c("Primer set - ", primer_label)) +
+    ggtitle(str_c("Primer set - ", primer_set_label_long)) +
     xlim(xmin,xmax)
   
   print(g)
@@ -500,7 +497,7 @@ for (one_primer_set in c(4, 29)){
     labs( x = "Amplicon size (bp)",
           y = "Density",
           fill = "Supergroup") +
-    # ggtitle(str_c("Primer set - ", primer_label)) +
+    # ggtitle(str_c("Primer set - ", primer_set_label_long)) +
     xlim(xmin,xmax) 
   
   print(g)
@@ -648,8 +645,8 @@ for (one_primer_set in c(4, 29)) {
     filter(!(supergroup %in% c("Apusozoa", "Eukaryota_X") ) )
     
   g <- ggplot() +
-    geom_histogram(data = filter(df, !is.na(fwd_mismatch_primer_position_3prime)),
-                   aes(x = fwd_mismatch_primer_position_3prime, fill = supergroup),
+    geom_histogram(data = filter(df, !is.na(fwd_mismatch_primer_position_5prime)),
+                   aes(x = fwd_mismatch_primer_position_5prime, fill = supergroup),
                    binwidth = 1, 
                    stat = "bin",
                    alpha = 1)  +
@@ -657,15 +654,15 @@ for (one_primer_set in c(4, 29)) {
     theme_bw()   +
     scale_x_continuous(minor_breaks = 0:30) +
     labs(y = "Density",
-         x = "Position of mismatches from 3' end",
+         x = "Position of mismatches from 5' end",
          title = "fwd") 
   
   print(g)
   fig3[[str_c(one_primer_set, "mismatches positions fwd", sep = " ")]] <- g  
   
   g <- ggplot() +
-    geom_histogram(data = filter(df, !is.na(rev_mismatch_primer_position_3prime)),
-                   aes(x = rev_mismatch_primer_position_3prime, fill = supergroup),
+    geom_histogram(data = filter(df, !is.na(rev_mismatch_primer_position_5prime)),
+                   aes(x = rev_mismatch_primer_position_5prime, fill = supergroup),
                    binwidth = 1, 
                    stat = "bin",
                    alpha = 1)  +
@@ -673,7 +670,7 @@ for (one_primer_set in c(4, 29)) {
     theme_bw()   +
     scale_x_continuous(minor_breaks = 0:30) +
     labs(y = "Density",
-         x = "Position of mismatches from 3' end",
+         x = "Position of mismatches from 5' end",
          title = "rev") 
   
   print(g)
@@ -728,7 +725,7 @@ for (one_region in gene_regions) {
 # % Ampli  
   
   g <- ggplot(pr2_match_summary_primer_set_region_long) + 
-    geom_col(aes(x= primer_label, y=pct_seq, 
+    geom_col(aes(x= primer_set_label_long, y=pct_seq, 
                  fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
     theme_bw() +
     xlab("Primer set") + ylab("% of sequences amplified") + 
@@ -749,8 +746,8 @@ for (one_region in gene_regions) {
 
 
    g <- ggplot(filter(pr2_match_summary_primer_set_region, !is.nan(ampli_size_mean))) + 
-    geom_point(aes(x=primer_label, y=ampli_size_mean), colour="black") +
-    geom_errorbar(aes(x=primer_label, 
+    geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
+    geom_errorbar(aes(x=primer_set_label_long, 
                       ymax=ampli_size_mean + ampli_size_sd, 
                       ymin=ampli_size_mean - ampli_size_sd)) +
     theme_bw() +
@@ -781,7 +778,7 @@ for (one_region in gene_regions) {
   filter(specific == "general")  
   
 g <- ggplot(pr2_mismatches,
-          aes(x = primer_label,
+          aes(x = primer_set_label_long,
               y = mismatch_pct,
               group = primer_set_id,
               fill = as.factor(mismatch_number)
@@ -818,7 +815,7 @@ for (specific_one in c("general", "specific")) {
       filter(specific == specific_one)
 
   g <- ggplot(df) + 
-    geom_col(aes(x=primer_label, y=pct_seq, 
+    geom_col(aes(x=primer_set_label_long, y=pct_seq, 
                  fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
     theme_bw() +
     xlab("Primer set") + ylab("% of sequences amplified") + 
@@ -841,8 +838,8 @@ for (specific_one in c("general", "specific")) {
       filter(specific == specific_one)
   
   g <- ggplot(df) + 
-    geom_point(aes(x=primer_label, y=ampli_size_mean), colour="black") +
-    geom_errorbar(aes(x=primer_label, 
+    geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
+    geom_errorbar(aes(x=primer_set_label_long, 
                       ymax=ampli_size_mean + ampli_size_sd, 
                       ymin=ampli_size_mean - ampli_size_sd)) +
     theme_bw() +
@@ -881,7 +878,7 @@ pr2_mismatches <- pr2_match_summary_primer_set %>%
   filter(specific == specific_one)
   
 g <- ggplot(pr2_mismatches,
-          aes(x = primer_label,
+          aes(x = primer_set_label_long,
               y = mismatch_pct,
               group = primer_set_id,
               fill = as.factor(mismatch_number)
@@ -912,8 +909,8 @@ g <- ggplot(pr2_mismatches,
 ```{r fig.height=30, fig.width=30}
 
 
-  ggplot(pr2_match_final, aes(x = primer_label)) +
-    geom_boxplot(aes(y = fwd_mismatch_primer_position_3prime),
+  ggplot(pr2_match_final, aes(x = primer_set_label_long)) +
+    geom_boxplot(aes(y = fwd_mismatch_primer_position_5prime),
                      outlier.alpha = 0.3,
                      color = "blue") +
     coord_flip() +
@@ -925,8 +922,8 @@ g <- ggplot(pr2_mismatches,
          title = "Primer fwd") +
   facet_wrap(vars(specific), nrow = 2, scales = "free_y")
   
-  ggplot(pr2_match_final, aes(x = primer_label)) +
-    geom_boxplot(aes(y = rev_mismatch_primer_position_3prime),
+  ggplot(pr2_match_final, aes(x = primer_set_label_long)) +
+    geom_boxplot(aes(y = rev_mismatch_primer_position_5prime),
                      outlier.alpha = 0.3,
                      color = "red") +
     coord_flip() +
@@ -938,8 +935,8 @@ g <- ggplot(pr2_mismatches,
          title = "Primer rev") +
   facet_wrap(vars(specific), nrow = 2, scales = "free_y")
   
-  ggplot(filter(pr2_match_final, !is.na(rev_mismatch_primer_position_3prime))) +
-    geom_histogram(aes(x = rev_mismatch_primer_position_3prime),
+  ggplot(filter(pr2_match_final, !is.na(rev_mismatch_primer_position_5prime))) +
+    geom_histogram(aes(x = rev_mismatch_primer_position_5prime),
                    color = "red",
                    binwidth = 1,
                    stat = "density") +
@@ -948,7 +945,7 @@ g <- ggplot(pr2_mismatches,
     labs(y = "Primer set",
          x = "Position of mismatches",
          title = "Primer rev") +
-  facet_wrap(vars(primer_label), ncol = ncol)
+  facet_wrap(vars(primer_set_label_long), ncol = ncol)
  
 ```
 ## By supergroup
@@ -985,7 +982,7 @@ for (specific_one in c("general", "specific")) {
     ggtitle (str_c(specific_one, " primers" )) +
     scale_fill_viridis_d(option = "inferno") +
     ylim(0,100) +
-    facet_wrap(~ primer_label, scales ="fixed", ncol = ncol) + 
+    facet_wrap(~ primer_set_label_long, scales ="fixed", ncol = ncol) + 
     guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "top", legend.box = "horizontal")+ 
     theme(legend.position="none")
@@ -1010,7 +1007,7 @@ for (specific_one in c("general", "specific")) {
     ylab("Amplicon size (bp)")  +
     ggtitle (str_c(specific_one, " primers" )) +
     geom_hline(yintercept = c(450,550) , linetype= 2) +
-    facet_wrap(~ primer_label, scales = "fixed", ncol = ncol)
+    facet_wrap(~ primer_set_label_long, scales = "fixed", ncol = ncol)
 
   print(g)
   
@@ -1060,7 +1057,7 @@ for (specific_one in c("general", "specific")) {
   guides(fill = guide_legend(nrow = 1)) +
   theme(legend.position = "top", legend.box = "horizontal") +
   coord_flip()   +
-  facet_wrap(vars(primer_label), ncol = ncol)
+  facet_wrap(vars(primer_set_label_long), ncol = ncol)
   
   print(g)
   
@@ -1095,7 +1092,7 @@ for (specific_one in c("general", "specific")) {
     theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0))  +
     scale_fill_viridis_d(option = "inferno") +
     ylim(0,100) +
-    facet_wrap(vars(primer_label), scales ="fixed", ncol = ncol) + 
+    facet_wrap(vars(primer_set_label_long), scales ="fixed", ncol = ncol) + 
     guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "top", legend.box = "horizontal")+ 
     theme(legend.position="none")
@@ -1121,7 +1118,7 @@ g <- ggplot(filter(pr2_match_summary_filtered_one, !is.nan(ampli_size_mean))) +
     # ggtitle (str_c("Set -", one_primer_set, 
     #                " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
     geom_hline(yintercept = c(450,550) , linetype= 2) +
-    facet_wrap(~ primer_label, scales ="fixed", ncol = ncol)
+    facet_wrap(~ primer_set_label_long, scales ="fixed", ncol = ncol)
 
   print(g)
   
