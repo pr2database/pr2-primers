@@ -28,10 +28,16 @@ ui <- fluidPage(
                c("General" = "general",
                  "Specific" = "specific")),
       ),conditionalPanel(
-        'input.dataset === "Amplification - supergroups"',
+        'input.dataset === "Amplification - by group"',
           selectInput("primer_set_id", "Primer set",
                setNames(primer_sets_tested$primer_set_id, primer_sets_tested$primer_set_label_long),
                selected = 4),
+          radioButtons("taxo_level", "Taxonomic level:",
+               c("Supergroup" = "supergroup",
+                 "Class" = "class")),
+          selectInput("division", "If choose Class, select Division",
+               setNames(pr2_taxo$division, str_c(pr2_taxo$supergroup, pr2_taxo$division, sep = "-")),
+               selected = "Chlorophyta"),          
       ),
     ),
     mainPanel(
@@ -40,7 +46,7 @@ ui <- fluidPage(
         tabPanel("Primers", dataTableOutput("table_primers")),
         tabPanel("Primer sets", dataTableOutput("table_primer_sets")),
         tabPanel("Amplification - eukaryotes", plotOutput("plot_matches")),
-        tabPanel("Amplification - supergroups", plotOutput("plot_matches_sg"))
+        tabPanel("Amplification - by group", plotOutput("plot_matches_group"))
         # tabPanel("Amplification - one set", dataTableOutput("test"))
       )
     )
@@ -68,9 +74,9 @@ server <- function(input, output) {
     plot_matches(input$specificity)
   }, width = 1200, height = 600, res = 96)
 
-  # Plot matches sg
-  output$plot_matches_sg <- renderPlot({
-    plot_matches_sg(input$primer_set_id)
+  # Plot matches at group level
+  output$plot_matches_group <- renderPlot({
+    plot_matches_group(input$primer_set_id, input$taxo_level, input$division)
   }, width = 1200, height = 600, res = 96)
 
   # Test

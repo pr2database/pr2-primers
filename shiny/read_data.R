@@ -15,6 +15,9 @@ library(patchwork)
 max_mismatch = 2
 gene_selected = "18S_rRNA"  # Can be 18S_rRNA or 16_rRNA
 
+sequence_length_min = 1500
+sequence_length_min_V9 = 1650 
+sequence_length_min_V4 = 1200 
 
 # Read the data -----------------------------------------------------------
 
@@ -61,24 +64,12 @@ pr2_match_euk_long_2 <- pr2_match_euk %>%
 primer_sets_tested <- primer_sets %>% 
   filter(primer_set_id %in% pr2_match_euk$primer_set_id)
 
-# --- At supergroup level
+# This to give the list of higher taxonomic levels
 
-pr2_match_sg <- readRDS("data/pr2_match_18S_rRNA_mismatches_2_summary_sg.rds")
+load("data/pr2_match_18S_rRNA_set_008_mismatches_2.rda")
 
-
-pr2_match_sg_long <- pr2_match_sg %>% 
-  tidyr::pivot_longer(names_to="mismatch_number", 
-                      values_to = "mismatch_pct", 
-                      cols = contains("ampli_mismatch"),
-                      names_prefix = "ampli_mismatch_") %>% 
-  select(-contains("ampli_mismatch")) %>% 
-  mutate(mismatch_number = str_sub(mismatch_number,1 , 1)) %>% 
-  mutate(mismatch_number = str_replace(mismatch_number,"5" , "5+")) %>% 
-  filter(n_seq > 20) %>% 
-  filter(!(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
-
-# --- At class level
-
-pr2_match_class <- readRDS("data/pr2_match_18S_rRNA_mismatches_2_summary_class.rds")
+  pr2_taxo <- pr2_match %>% 
+    select(supergroup, division) %>% 
+    arrange(supergroup, division) %>% 
+    distinct()
   
-
