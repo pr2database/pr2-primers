@@ -98,7 +98,8 @@ gene_selected = "18S_rRNA"  # Can be 18S_rRNA or 16_rRNA
 rda_file_label = "_all"  # This label is added at the end of the rda file name
 gene_regions = c("V4", "V9")
 
-# primer_sets_excluded = c(73, 74) # These primers should not be included (semi nested PCR)
+# These primers should not be included (semi nested PCR or amplify very few sequences)
+primer_sets_excluded = c(73, 74, 37, 67, 91, 68) 
 
 sequence_length_min = 1500
 sequence_length_min_V9 = 1650 
@@ -136,7 +137,7 @@ if(gene_selected == "18S_rRNA") {
     
   
   gene_regions_all = unique(primer_sets$gene_region)
-  print
+  print(gene_regions_all)
   
   } else if (gene_selected == "16S_rRNA"){
   primer_sets <- primer_sets %>% 
@@ -160,14 +161,14 @@ primer_sets <- primer_sets %>%
           by = c("rev_id" = "primer_id")) %>% 
   mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
   select(gene_region, specificity, 
-         primer_set_id, 
+         primer_set_id, primer_set_name,
          contains("fwd"), 
          contains("rev"),
          length_yeast, 
          reference:remark) %>%
   select(-fwd_id, -rev_id) %>% 
   arrange(gene_region,  fwd_start_yeast, rev_start_yeast) %>% 
-  # filter(! (primer_set_id %in% primer_sets_excluded )) %>% 
+  filter(! (primer_set_id %in% primer_sets_excluded )) %>%
   mutate(specific = ifelse(is.na(specificity), "general", "specific")) %>% 
   relocate(specific, .before = specificity)
   
@@ -225,7 +226,7 @@ All sequences for which introns have been removed are filtered out (contain "_UC
   for (i in 1:nrow(primer_sets)) {
     cat("i = ", i, "\n")
     rda_file_label <- str_c(sprintf("_set_%03d", primer_sets$primer_set_id[i]), "_mismatches_", max_mismatch)
-    load(file=str_c("../shiny/data/individual primers/pr2_match_", gene_selected ,rda_file_label, ".rda"))
+    load(file=str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda"))
     pr2_match_list[[i]] <- pr2_match
   }
 
@@ -247,7 +248,7 @@ All sequences for which introns have been removed are filtered out (contain "_UC
 
   print(str_c("Before filtration: ", nrow(pr2_match_final)))
 
-# Replace the gene_region and primer_label_short since they can be changed in the database
+# Replace the gene_region and primer_set_label_short since they can be changed in the database
   primer_sets_labels <- primer_sets %>% 
     mutate(primer_set_label_short = str_c(str_sub(gene_region,1,2), 
                       sprintf("%02d", primer_set_id), 
@@ -260,26 +261,27 @@ All sequences for which introns have been removed are filtered out (contain "_UC
            ) %>% 
     # Remove the last underscore if left by itself
     mutate(primer_set_label_short = str_replace(primer_set_label_short, " $", "")) %>% 
-    select(primer_set_id, primer_set_label_short, gene_region, specific, specificity) 
+    select(primer_set_id, 
+           primer_set_label_short,
+           primer_set_label_long,
+           gene_region, 
+           specific, 
+           specificity) 
   
-  pr2_match_final <- pr2_match_final %>% 
+  pr2_match_final <- pr2_match_final%>% 
+      left_join(primer_sets_labels) %>% 
     # Remove sequences for which the introns have been removed
       filter(! str_detect(pr2_accession, "_UC")) %>% 
     # Remove sequence that are shorter
       filter((str_detect(gene_region, "V4") & sequence_length>= sequence_length_min_V4) |
              (str_detect(gene_region, "V9") & sequence_length>= sequence_length_min_V9) |
              (! str_detect(gene_region, "V4|V9") & sequence_length>= sequence_length_min)) %>% 
-    # remove "_" from primer_set_labels
       mutate(mismatch_number = fwd_mismatch_number + rev_mismatch_number) %>% 
     # Only keep the selected primers
-      filter(primer_set_id %in% primer_sets$primer_set_id) %>%
-      select(-gene_region) %>% 
-      left_join(primer_sets_labels)
+      filter(primer_set_id %in% primer_sets$primer_set_id) 
   
   print(str_c("After filtration: ", nrow(pr2_match_final)))
   
-saveRDS(pr2_match_final,
-        file=str_c("../shiny/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_filtered.rds"))
 
 ```
 
@@ -291,7 +293,13 @@ saveRDS(pr2_match_final,
 
 primer_summary <- function(pr2_match, taxo_level){
   summary <-  pr2_match  %>% 
-    group_by({{taxo_level}}, gene_region, primer_set_label_long, primer_set_id, specific, specificity ) %>% 
+    group_by({{taxo_level}}, 
+             gene_region, 
+             primer_set_label_long, 
+             primer_set_label_short,
+             primer_set_id, 
+             specific, 
+             specificity ) %>% 
     summarize (n_seq = n(),
                fwd_number = sum(!is.na(fwd_pos)),
                fwd_pct = fwd_number/n_seq*100, 
@@ -324,7 +332,7 @@ primer_summary <- function(pr2_match, taxo_level){
 # Compute the position of the primer for nearly complete sequences
 summary_pos <-  pr2_match  %>% 
     filter(sequence_length>= sequence_length_min_V9) %>% 
-    group_by({{taxo_level}}, gene_region, primer_set_label_long, primer_set_id ) %>% 
+    group_by({{taxo_level}}, primer_set_id ) %>% 
     summarize (fwd_pos_mean = mean(fwd_pos, na.rm=TRUE),
                rev_pos_mean = mean(rev_pos, na.rm=TRUE)) %>% 
     ungroup()
@@ -338,15 +346,15 @@ summary <- summary %>%
 
 ## Summarize all eukaryotes
 
-```{r summary_euks, warning=FALSE , eval=FALSE}
+```{r summary_euks, warning=FALSE , eval=TRUE}
 
   pr2_match_summary_primer_set <- primer_summary(pr2_match_final, kingdom)
 
-  ```
+```
 
 ## Summarize per supergroup
 
-```{r summary_supergroups, warning=FALSE, eval=FALSE}
+```{r summary_supergroups, warning=FALSE, eval=TRUE}
 
   pr2_match_summary_primer_set_sg <- primer_summary(pr2_match_final, supergroup)
 
@@ -354,7 +362,7 @@ summary <- summary %>%
 
 ## Summarize per class 
 
-```{r summary_class, warning=FALSE, eval=FALSE}
+```{r summary_class, warning=FALSE, eval=TRUE}
 
   pr2_match_summary_primer_set_class <- primer_summary(pr2_match_final, class) 
 
@@ -370,15 +378,13 @@ summary <- summary %>%
 ```
 ## Save summaries (also in shiny)
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
   saveRDS(pr2_match_summary_primer_set, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
   saveRDS(pr2_match_summary_primer_set_sg, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_sg.rds"))
   saveRDS(pr2_match_summary_primer_set_class, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds"))
   
   # Shiny
-  saveRDS(pr2_match_summary_primer_set, file=str_c("../shiny/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
-  saveRDS(pr2_match_summary_primer_set_sg, file=str_c("../shiny/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_sg.rds"))
-  saveRDS(pr2_match_summary_primer_set_class, file=str_c("../shiny/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds"))
+  saveRDS(pr2_match_summary_primer_set, file=str_c("../shiny/data/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
 
 ```
 
@@ -478,6 +484,9 @@ for (one_primer_set in c(4, 29)){
   pr2_match_final_one <- pr2_match_final %>% 
     filter(primer_set_id==one_primer_set) %>% 
     filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X", "Protoalveoalata") ))
+  
+  primer_set_label_long = pr2_match_final_one$primer_set_label_long[1]
+  
     
   g <- ggplot(pr2_match_final_one, aes(x= ampli_size)) + 
     geom_density(fill="blue", alpha=0.9) +
@@ -732,7 +741,8 @@ for (one_region in gene_regions) {
     scale_fill_manual(name = "",  values = c("ampli_pct" = "black", "fwd_pct" = "grey80","rev_pct" = "grey40"), 
                       labels=c( "Amplicons", "Primer rev", "Primer fwd")) +
     ggtitle (str_c(one_region, " - Percentage of sequences recovered"))+
-    theme(axis.text.x = element_text(angle = 0, hjust = 1)) +
+    theme(axis.text.x = element_text(angle = 0, hjust = 1))+
+    theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
     ylim(0,100) +
     coord_flip() + 
     guides(fill = guide_legend(nrow = 1)) +
@@ -747,7 +757,7 @@ for (one_region in gene_regions) {
 
    g <- ggplot(filter(pr2_match_summary_primer_set_region, !is.nan(ampli_size_mean))) + 
     geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
-    geom_errorbar(aes(x=primer_set_label_long, 
+    geom_errorbar(aes(x=primer_set_label_short, 
                       ymax=ampli_size_mean + ampli_size_sd, 
                       ymin=ampli_size_mean - ampli_size_sd)) +
     theme_bw() +
@@ -756,7 +766,8 @@ for (one_region in gene_regions) {
     ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
     geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
     ylim(0,850) + 
-    theme(axis.text.x = element_text(angle = 0, hjust = 1)) + 
+    theme(axis.text.x = element_text(angle = 0, hjust = 1))+
+    theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) + 
     coord_flip()  
    
   print(g)
@@ -778,7 +789,7 @@ for (one_region in gene_regions) {
   filter(specific == "general")  
   
 g <- ggplot(pr2_mismatches,
-          aes(x = primer_set_label_long,
+          aes(x = primer_set_label_short,
               y = mismatch_pct,
               group = primer_set_id,
               fill = as.factor(mismatch_number)
@@ -982,7 +993,7 @@ for (specific_one in c("general", "specific")) {
     ggtitle (str_c(specific_one, " primers" )) +
     scale_fill_viridis_d(option = "inferno") +
     ylim(0,100) +
-    facet_wrap(~ primer_set_label_long, scales ="fixed", ncol = ncol) + 
+    facet_wrap(~ primer_set_label_short, scales ="fixed", ncol = ncol) + 
     guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "top", legend.box = "horizontal")+ 
     theme(legend.position="none")
@@ -1007,7 +1018,7 @@ for (specific_one in c("general", "specific")) {
     ylab("Amplicon size (bp)")  +
     ggtitle (str_c(specific_one, " primers" )) +
     geom_hline(yintercept = c(450,550) , linetype= 2) +
-    facet_wrap(~ primer_set_label_long, scales = "fixed", ncol = ncol)
+    facet_wrap(~ primer_set_label_short, scales = "fixed", ncol = ncol)
 
   print(g)
   
@@ -1057,7 +1068,7 @@ for (specific_one in c("general", "specific")) {
   guides(fill = guide_legend(nrow = 1)) +
   theme(legend.position = "top", legend.box = "horizontal") +
   coord_flip()   +
-  facet_wrap(vars(primer_set_label_long), ncol = ncol)
+  facet_wrap(vars(primer_set_label_short), ncol = ncol)
   
   print(g)
   
@@ -1092,7 +1103,7 @@ for (specific_one in c("general", "specific")) {
     theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0))  +
     scale_fill_viridis_d(option = "inferno") +
     ylim(0,100) +
-    facet_wrap(vars(primer_set_label_long), scales ="fixed", ncol = ncol) + 
+    facet_wrap(vars(primer_set_label_short), scales ="fixed", ncol = ncol) + 
     guides(fill = guide_legend(nrow = 1)) +
     theme(legend.position = "top", legend.box = "horizontal")+ 
     theme(legend.position="none")
@@ -1118,7 +1129,7 @@ g <- ggplot(filter(pr2_match_summary_filtered_one, !is.nan(ampli_size_mean))) +
     # ggtitle (str_c("Set -", one_primer_set, 
     #                " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
     geom_hline(yintercept = c(450,550) , linetype= 2) +
-    facet_wrap(~ primer_set_label_long, scales ="fixed", ncol = ncol)
+    facet_wrap(~ primer_set_label_short, scales ="fixed", ncol = ncol)
 
   print(g)
   
@@ -1184,7 +1195,7 @@ for (one_primer_set in c(16, 17, 35)) {
 
 ## Table 1 and Supplementary tables
 
-```{r, eval=FALSE}
+```{r, eval=TRUE}
   if(gene_selected == "18S_rRNA") file_name_xls = "../output/primers 18S.xlsx"
 
   sheets = list( `Table 1`= primer_sets,
@@ -1206,30 +1217,58 @@ for (one_primer_set in c(16, 17, 35)) {
 
 # Figures
 
+```{r}
+library(patchwork)
+```
+
+
 ## Fig. 1 - V4 and V9 - Amplification % and size
 
-```{r,  fig.height=12, fig.width=12, eval=FALSE}
+```{r,  fig.height=12, fig.width=12, eval=TRUE}
 
-legend_pct <- cowplot::get_legend( fig1[["V4 pct"]] + 
-                      # create some space to the left of the legend    
-                      theme(legend.box.margin = margin(0, 0, 0, 20))
-                    )
+# legend_pct <- cowplot::get_legend( fig1[["V4 pct"]] + 
+#                       # create some space to the left of the legend    
+#                       theme(legend.box.margin = margin(0, 0, 0, 20))
+#                     )
+# 
+# legend_mismatches <- cowplot::get_legend( fig1[["V4 mismatches"]] + 
+#                       # create some space to the left of the legend    
+#                       theme(legend.box.margin = margin(0, 0, 0, 20))
+#                     )
+# 
+# fig_1 <- cowplot::plot_grid(legend_pct,legend_mismatches, NULL,
+#                             fig1[["V4 pct"]]  +ggtitle("")+ theme(legend.position="none") + ylab(""),
+#                             fig1[["V4 mismatches"]] +ggtitle("")+ 
+#                               theme(legend.position="none") + 
+#                               xlab("") + ylab("") + 
+#                               theme(axis.text.y = element_blank()) , 
+#                             fig1[["V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
+#                               theme(axis.text.y = element_blank()),
+#                             fig1[["V9 pct"]]  +ggtitle("")+ theme(legend.position="none"),  
+#                             fig1[["V9 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
+#                               theme(axis.text.y = element_blank()), 
+#                             fig1[["V9 size"]] +ggtitle("") + xlab("")+ 
+#                               theme(axis.text.y = element_blank()), 
+#                    labels = c("","","","A","","", "B","",""), label_size = 22, label_x = 0.05,
+#                    ncol = 3, nrow = 3, align = "hv", 
+#                    rel_heights = c(1,20,6), rel_widths = c(18,12,12) )
+# 
+# 
+# fig_1
 
-legend_mismatches <- cowplot::get_legend( fig1[["V4 mismatches"]] + 
-                      # create some space to the left of the legend    
-                      theme(legend.box.margin = margin(0, 0, 0, 20))
-                    )
-
-fig_1 <- cowplot::plot_grid(legend_pct, NULL,legend_mismatches,
-                            fig1[["V4 pct"]]  +ggtitle("")+ theme(legend.position="none") + ylab(""),
-                            fig1[["V4 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("") + ylab(""), 
-                            fig1[["V4 size"]] +ggtitle("") + xlab("") + ylab(""),
-                            fig1[["V9 pct"]]  +ggtitle("")+ theme(legend.position="none"),  
-                            fig1[["V9 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab(""), 
-                            fig1[["V9 size"]] +ggtitle("") + xlab(""), 
-                   labels = c("","","","A","","", "B","",""), label_size = 22, label_x = 0.05,
-                   ncol = 3, nrow = 3, align = "hv", 
-                   rel_heights = c(1,20,6), rel_widths = c(12,12,10) )
+fig_1 <-( fig1[["V4 pct"]]  +ggtitle("")+ ylab("") +
+          fig1[["V4 mismatches"]] +ggtitle("") +
+            xlab("") + ylab("") + 
+            theme(axis.text.y = element_blank()) + 
+          fig1[["V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
+            theme(axis.text.y = element_blank())
+          )/(
+          fig1[["V9 pct"]]  +ggtitle("")+ theme(legend.position="none")+  
+          fig1[["V9 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
+            theme(axis.text.y = element_blank())+ 
+          fig1[["V9 size"]] +ggtitle("") + xlab("")+ 
+            theme(axis.text.y = element_blank())
+          ) +plot_layout(heights = c(20, 4))
 fig_1
 
 ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_V4_V9.pdf",
@@ -1266,6 +1305,24 @@ fig_1 <- cowplot::plot_grid(legend_pct, legend_mismatches, NULL,
                     ncol = 3, nrow = 3, align = "hv", 
                    rel_heights = c(1,38,26), rel_widths = c(12,12,10) )
 fig_1
+
+
+fig_1 <-( fig1[["general pct"]]  +ggtitle("")+ ylab("") + xlab("") +
+          fig1[["general mismatches"]] +ggtitle("") +
+            xlab("") + ylab("") + 
+            theme(axis.text.y = element_blank()) + 
+          fig1[["general size"]] +ggtitle("") + xlab("") + ylab("")+ 
+            theme(axis.text.y = element_blank())
+          )/(
+          fig1[["specific pct"]]  +ggtitle("")+ theme(legend.position="none")+ xlab("")+  
+          fig1[["specific mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
+            theme(axis.text.y = element_blank())+ 
+          fig1[["specific size"]] +ggtitle("") + xlab("")+ 
+            theme(axis.text.y = element_blank())
+          ) +plot_layout(heights = c(38, 26))
+fig_1
+
+
 
 ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_all.pdf",
            width = 15 , height = 12, scale=1.75, units="cm", useDingbats=FALSE)

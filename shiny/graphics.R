@@ -74,7 +74,7 @@ plot_matches <- function(specific_one = "general") {
       filter(specific == specific_one)  
   
   g2 <- ggplot(df,
-            aes(x = primer_label,
+            aes(x = primer_set_label_long,
                 y = mismatch_pct,
                 group = primer_set_id,
                 fill = as.factor(mismatch_number)
@@ -101,8 +101,8 @@ plot_matches <- function(specific_one = "general") {
       filter(specific == specific_one)
   
   g3 <- ggplot(df) + 
-    geom_point(aes(x=primer_label, y=ampli_size_mean), colour="black") +
-    geom_errorbar(aes(x=primer_label, 
+    geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
+    geom_errorbar(aes(x=primer_set_label_long, 
                       ymax=ampli_size_mean + ampli_size_sd, 
                       ymin=ampli_size_mean - ampli_size_sd)) +
     theme_bw() +
