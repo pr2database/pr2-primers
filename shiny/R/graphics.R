@@ -18,7 +18,7 @@ plot_matches <- function(type = "general") {
          y = "% of sequences amplified",
          title = str_c("Primer type: ",type),
          subtitle = "% of sequences amplified\n with 2 mismatches on each primer") +
-    scale_fill_manual(name = "",  values = c("ampli_pct" = "black", "fwd_pct" = "grey80","rev_pct" = "grey40"), 
+    scale_fill_manual(name = "",  values = c("ampli_pct" = "black", "fwd_pct" = "blue","rev_pct" = "red"), 
                       labels=c( "Amplicons", "Primer rev", "Primer fwd")) +
     theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0)) +
     ylim(0,100) +

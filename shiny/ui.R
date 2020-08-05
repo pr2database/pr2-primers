@@ -76,8 +76,9 @@ ui <- fluidPage(
         
          useShinyFeedback(), # include shinyFeedback
          h3("Test your primer set"),
-         p("Primer set is tested against the PR2 database. Use only UIPAC characters (ACGTRYSWKMBDHVN). 
-           Length of primers: between 15 and 30 bp."),
+         p("Primer set is tested against the PR2 database."),
+         p("Use only UIPAC characters (", strong("ACGTRYSWKMBDHVN"),")."), 
+         p(strong("Length of primers:"), "between 15 and 30 bp."),
         
          textInput("fwd_seq", "Primer forward (5' -> 3')", value = "GCCAGCAVCYGCGGTAAY"),
          radioButtons("fwd_mis", "Max mismatches", inline = TRUE,  choices = c(0, 1, 2), selected = 0),

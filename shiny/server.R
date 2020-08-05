@@ -10,7 +10,7 @@ server <- function(input, output, session) {
   
   output$table_primers_download <- downloadHandler(
           filename = function() {str_c("primers_", Sys.Date(), ".tsv")},
-          content = function(path) {write_tsv(primers, path=path)},
+          content = function(path) {export(primers, file=path)},
           outputArgs = list(label = "Download primers")
   )      
 
@@ -23,7 +23,7 @@ server <- function(input, output, session) {
   
   output$table_primer_sets_download <- downloadHandler(
           filename = function() {str_c("primer_sets_", Sys.Date(), ".tsv")},
-          content = function(path) {write_tsv(primer_sets, path=path)},
+          content = function(path) {export(primer_sets, file=path)},
           outputArgs = list(label = "Download primer sets")
   )      
 
@@ -31,10 +31,10 @@ server <- function(input, output, session) {
   # 3 - Plot matches
   output$plot_matches_all <- renderUI({
         tagList(
-          p("Left panel: % of sequence amplified. 
-             Center panel: number of mismatches. 
-             Right panel: Amplicon size"),
-          renderPlot({plot_matches(input$type)}, width = 1200, height = 600, res = 96)
+          p(strong("Left panel:"), "% of sequence amplified.", 
+             strong("Center panel:"), "number of mismatches.", 
+             strong("Right panel:"), " Amplicon size"),
+          renderPlot({plot_matches(input$type)}, width = 1200, height = 1000, res = 96)
         )  
   })
   
@@ -52,9 +52,9 @@ server <- function(input, output, session) {
      output$plot_matches_one <- renderUI({
         # req(plot_matches_detailed_taxa_data())
         tagList( 
-           p("Top panel: Location of mismatches for fwd and reverse primer. 
-              Bottom panel left: number of mismatches.
-              Bottom panel right: amplicon size"),
+           p(strong("Top panel:"), "Location of mismatches for fwd and reverse primer.", 
+            strong("Bottom panel left"), "number of mismatches.",
+            strong("Bottom panel right:"), "amplicon size"),
            renderPlot({
            data_4()$gg
           }, width = 1200, height=function(){300 + 90 + 20*data_4()$n_taxa}, res = 96)
@@ -99,7 +99,7 @@ server <- function(input, output, session) {
       renderTable(primer_match_stats(), width = 400, colnames = FALSE),
       downloadHandler(
           filename = function() {str_c("primer_match_pr2_", Sys.Date(), ".tsv")},
-          content = function(path) {write_tsv(primer_match.df(), path=path)},
+          content = function(path) {export(primer_match.df(), file=path)},
           outputArgs = list(label = "Download results"),
       )
     )  
