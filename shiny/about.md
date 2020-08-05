@@ -1,0 +1,1 @@
+A database of eukaryotic rRNA primers and primer sets for metabarcoding studies compiled from the literature. 

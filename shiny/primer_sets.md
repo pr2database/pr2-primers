@@ -10,8 +10,8 @@
   primer_set_name |  name of the primer set (usually from author)
   fwd/rev_name | forward/reverse primer name
   fwd/rev_seq | forward/reverse primer sequence
-  fwd/rev_start | start of forward/reverse primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
-  fwd_end | end of forward/reverse primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
+  fwd/rev_start | start of primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
+  fwd/rev_end | end of primer relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
   length | length of amplified sequence relative to [FU970071](https://www.ncbi.nlm.nih.gov/nuccore/FU970071)
   reference | original reference where primer set was first defined
   doi | link to original paper

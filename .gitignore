@@ -2,14 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
-*.md
 *.tsv
-*.rda
-*.tsv
-*.html
-*.md
 *cache
-*files
 archives
 ~*
 wiki/
@@ -17,3 +11,6 @@ wiki/
 pr2_alignement*
 *version 1.0*
 *.dcf
+output*
+archives
+sandbox
