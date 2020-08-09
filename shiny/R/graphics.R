@@ -71,7 +71,7 @@ plot_matches <- function(type = "general") {
          subtitle = "Lines correspond to limits\n for Illumina 2x250 and 2x300") +
     # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
     geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
-    ylim(0,850) + 
+    ylim(0,850) +
     theme(axis.text.y = element_text(angle = 0, hjust = 0)) + 
     theme(axis.text.y = element_blank()) +  #` Remove legend`
     coord_flip()  
@@ -207,7 +207,7 @@ plot_matches <- function(type = "general") {
   }
   
   
-# Function to plot mismatches at a given taxonomic level for primer match  --------
+# Function to plot mismatches at a given taxonomic level for user primer match  -----
 
   plot_matches_simple_taxa <- function(df, taxo_level_quoted = "supergroup", taxo_name = "Chlorophyta"){
     

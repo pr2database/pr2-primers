@@ -175,7 +175,7 @@ primer_sets <- primer_sets %>%
   
   # , lubridate::today()
   file_name = str_c("../output/Table_primers_",gene_selected, ".xlsx")
-  write.xlsx(primer_sets, file = file_name, firstActiveRow = 2)
+  export(primer_sets, file = file_name, firstActiveRow = 2)
   
   n_primers <- list()
   n_primers[["general"]] <- nrow(filter(primer_sets, specific == "general"))
@@ -224,9 +224,21 @@ All sequences for which introns have been removed are filtered out (contain "_UC
   pr2_match_list <- list()
   
   for (i in 1:nrow(primer_sets)) {
+    skip_to_next <- FALSE
     cat("i = ", i, "\n")
+    
     rda_file_label <- str_c(sprintf("_set_%03d", primer_sets$primer_set_id[i]), "_mismatches_", max_mismatch)
-    load(file=str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda"))
+    file_name = str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda")
+    
+    tryCatch(load(file=file_name), 
+             error=function(e) {
+               warning(stringr::str_c("Cannot read file: ", file_name))
+               skip_to_next <<- TRUE        },
+		         call. = FALSE, immediate. = TRUE, noBreaks. = TRUE)    
+    
+    # load(file=str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda"))
+    
+    if(skip_to_next) { next } 
     pr2_match_list[[i]] <- pr2_match
   }
 

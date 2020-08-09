@@ -46,21 +46,23 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
 # --- Primers
 
   primers<- import("data/primers.rds") %>% 
-    filter(str_detect(gene, "rRNA"))
+    filter(str_detect(gene, "rRNA")) 
     
   primer_sets<- import("data/primer_sets.rds") %>% 
     filter(str_detect(gene, "rRNA"))  %>% 
-    mutate(primer_set_label_long = str_c(sprintf("%02d",  primer_set_id), "-", 
+    mutate(primer_set_label_long = str_c(sprintf("%03d",  primer_set_id), "-", 
                                          gene_region, 
                                          primer_set_name, "-", 
                                          str_replace_na(specificity, "general"), 
-                                         sep = " "))
+                                         sep = " ")) %>% 
+    arrange(primer_set_id)
 
 
 # --- At euk level
 
   pr2_match_euk <- import("data/pr2_match_18S_rRNA_mismatches_2_summary.rds") %>% 
-    left_join(select(primer_sets, primer_set_id, primer_set_label_long))
+    select(-primer_set_label_long) %>% 
+    left_join(select(primer_sets, primer_set_id, primer_set_label_long)) 
   
   pct_category_order <- data.frame(pct_category = c("ampli_pct","fwd_pct","rev_pct"), 
                                    pct_category_order = c(1, 3, 2))

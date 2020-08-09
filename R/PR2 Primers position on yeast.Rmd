@@ -111,5 +111,5 @@ primers_pos <- map2_dfr(primers$sequence,
 primers <- bind_cols(primers, primers_pos) %>% 
   filter(!is.na(start))
 
-write.xlsx(primers, file = str_c("output/primers_matches_yeast_", lubridate::today(), ".xlsx"), firstActiveRow = 2)
+export(primers, file = str_c("../output/primers_matches_yeast_", lubridate::today(), ".xlsx"), firstActiveRow = 2)
 ```
