@@ -390,7 +390,7 @@ summary <- summary %>%
  
   
 ```
-## Save summaries (also in shiny)
+## Save summaries
 
 ```{r, eval=TRUE}
   saveRDS(pr2_match_summary_primer_set, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
@@ -398,7 +398,7 @@ summary <- summary %>%
   saveRDS(pr2_match_summary_primer_set_class, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds"))
   
   # Shiny
-  saveRDS(pr2_match_summary_primer_set, file=str_c("../shiny/data/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
+  # saveRDS(pr2_match_summary_primer_set, file=str_c("../shiny/data/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
 
 ```
 
