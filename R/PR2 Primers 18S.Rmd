@@ -89,48 +89,42 @@ Load the variables common to the different scripts and the necessary libraries
 # Constants
 
 ```{r}
-# gene_selected = "16S rRNA"
-
-# for Geisen paper
 
 max_mismatch = 2
 gene_selected = "18S_rRNA"  # Can be 18S_rRNA or 16_rRNA
 rda_file_label = "_all"  # This label is added at the end of the rda file name
 gene_regions = c("V4", "V9")
+kingdoms = c("Eukaryota", "Bacteria", "Archaea")
 
 # These primers should not be included (semi nested PCR or amplify very few sequences)
 primer_sets_excluded = c(73, 74, 37, 67, 91, 68) 
 
-sequence_length_min = 1500
+sequence_length_min = 1350
 sequence_length_min_V9 = 1650 
 sequence_length_min_V4 = 1200 
 ```
 
 # Read primer file
 
-
-## Build the primer set Table
-
 Only keep the 18S primers with V region
 
 ```{r}
 
-# Read from local database
-pr2_db <- db_info("pr2_google")
-pr2_db_con <- db_connect(pr2_db)
-
-primers <- tbl(pr2_db_con, "pr2_primers") %>% 
-  collect()
-primer_sets_all <- tbl(pr2_db_con, "pr2_primer_sets") %>% 
-  collect()
-
-disconnect <- db_disconnect(pr2_db_con)
-
-if(gene_selected == "18S_rRNA") {
+  primers <- import("../shiny/data/primers.rds")
+  primer_sets <- import("../shiny/data/primer_sets.rds")  
   
-  primer_sets <- primer_sets_all %>% 
+  
+  if(gene_selected == "18S_rRNA") {
+  
+  primers <- primers %>% 
     filter(gene == "18S rRNA",
-           !is.na(reference_doi) ,
+           !is.na(doi)
+          )
+  
+    
+  primer_sets <- primer_sets %>% 
+    filter(gene == "18S rRNA",
+           !is.na(doi) ,
            !str_detect(gene_region,"ITS|cloning|full")
             # str_detect(gene_region,"^V") # Start with V
           )
@@ -142,38 +136,14 @@ if(gene_selected == "18S_rRNA") {
   } else if (gene_selected == "16S_rRNA"){
   primer_sets <- primer_sets %>% 
   filter(specificity ==  "plastid" | (gene == "18S rRNA" & specificity == "universal" ))
-}
+  }
 
-primer_sets <- primer_sets %>% 
-  left_join(select(primers, 
-                   primer_id, 
-                   fwd_name=name,
-                   fwd_seq=sequence, 
-                   fwd_start_yeast= start_yeast, 
-                   fwd_end_yeast= end_yeast), 
-            by = c("fwd_id" = "primer_id")) %>% 
-  left_join(select(primers, 
-                 primer_id, 
-                 rev_name=name,
-                 rev_seq=sequence, 
-                 rev_start_yeast= start_yeast, 
-                 rev_end_yeast= end_yeast), 
-          by = c("rev_id" = "primer_id")) %>% 
-  mutate(length_yeast = rev_end_yeast - fwd_start_yeast + 1) %>% 
-  select(gene_region, specificity, 
-         primer_set_id, primer_set_name,
-         contains("fwd"), 
-         contains("rev"),
-         length_yeast, 
-         reference:remark) %>%
-  select(-fwd_id, -rev_id) %>% 
-  arrange(gene_region,  fwd_start_yeast, rev_start_yeast) %>% 
-  filter(! (primer_set_id %in% primer_sets_excluded )) %>%
-  mutate(specific = ifelse(is.na(specificity), "general", "specific")) %>% 
-  relocate(specific, .before = specificity)
+  primer_sets <- primer_sets %>% 
+    filter(! (primer_set_id %in% primer_sets_excluded )) %>%
+    mutate(specific = ifelse(is.na(specificity), "general", "specific")) %>% 
+    relocate(specific, .before = specificity)
   
-  
-  # , lubridate::today()
+
   file_name = str_c("../output/Table_primers_",gene_selected, ".xlsx")
   export(primer_sets, file = file_name, firstActiveRow = 2)
   
@@ -184,74 +154,21 @@ primer_sets <- primer_sets %>%
   
   
 
-knitr::kable(select(primer_sets,primer_set_id, fwd_name, rev_name, gene_region, length_yeast)) %>%
+knitr::kable(select(primer_sets,primer_set_name, primer_set_id, fwd_name, rev_name, gene_region, amplicon_size)) %>%
   kableExtra::kable_styling()
-       
+
+
 ```
 
 # Computing the matches
 
 This part is done by an R script `script_primers_pr2_match.R` that is executed in batch mode on Roscoff server.
 
-## Programing Notes
 
-* Use Biostrings
+# Read the file for all primer sets and filter
 
-Accessor methods : In the code snippets below, x is an MIndex object.  
+This file is created by the R script `script_update files.R`
 
-* length(x): The number of patterns that matches are stored for.
-* names(x): The names of the patterns that matches are stored for.
-* startIndex(x): A list containing the starting positions of the matches for each pattern.
-* endIndex(x): A list containing the ending positions of the matches for each pattern.
-* elementNROWS(x): An integer vector containing the number of matches for each pattern.
-* x[[i]]: Extract the matches for the i-th pattern as an IRanges object.
-* unlist(x, recursive=TRUE, use.names=TRUE): Return all the matches in a single IRanges object. recursive and use.names are ignored.
-* extractAllMatches(subject, mindex): Return all the matches in a single XStringViews object.
-
-One could also use another function which does not give the position
-* match_fwd <- vcountPattern(fwd, seq,max.mismatch=0, min.mismatch=0, with.indels=FALSE, fixed=FALSE, algorithm="auto")
-
-
-# Load the primer match files
-
-This avoids recomputing each time.
-
-All sequences for which introns have been removed are filtered out (contain "_UC" in pr2_accession)
-
-## Build the file for all primer sets - DO ONLY ONCE
-
-```{r, eval=FALSE}
-  pr2_match_list <- list()
-  
-  for (i in 1:nrow(primer_sets)) {
-    skip_to_next <- FALSE
-    cat("i = ", i, "\n")
-    
-    rda_file_label <- str_c(sprintf("_set_%03d", primer_sets$primer_set_id[i]), "_mismatches_", max_mismatch)
-    file_name = str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda")
-    
-    tryCatch(load(file=file_name), 
-             error=function(e) {
-               warning(stringr::str_c("Cannot read file: ", file_name))
-               skip_to_next <<- TRUE        },
-		         call. = FALSE, immediate. = TRUE, noBreaks. = TRUE)    
-    
-    # load(file=str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda"))
-    
-    if(skip_to_next) { next } 
-    pr2_match_list[[i]] <- pr2_match
-  }
-
-  pr2_match_final <- pr2_match_list %>% 
-  reduce(bind_rows)
-  
-  saveRDS(pr2_match_final, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, ".rds"))
-
-```
-
-
-
-## Read the file for all primer sets and filter
 
 ```{r load_matches, eval= TRUE}
 
@@ -265,7 +182,7 @@ All sequences for which introns have been removed are filtered out (contain "_UC
 # Replace the gene_region and primer_set_label_short since they can be changed in the database
   primer_sets_labels <- primer_sets %>% 
     mutate(primer_set_label_short = str_c(str_sub(gene_region,1,2), 
-                      sprintf("%02d", primer_set_id), 
+                      sprintf("%03d", primer_set_id), 
                       str_sub(str_replace_na(specificity, replacement = ""),1,3),
                       sep=" "),
            primer_set_label_long = str_c(gene_region, 
@@ -299,110 +216,9 @@ All sequences for which introns have been removed are filtered out (contain "_UC
 
 ```
 
-# Summarize the data in tables
-
-## Function
-
-```{r}
-
-primer_summary <- function(pr2_match, taxo_level){
-  summary <-  pr2_match  %>% 
-    group_by({{taxo_level}}, 
-             gene_region, 
-             primer_set_label_long, 
-             primer_set_label_short,
-             primer_set_id, 
-             specific, 
-             specificity ) %>% 
-    summarize (n_seq = n(),
-               fwd_number = sum(!is.na(fwd_pos)),
-               fwd_pct = fwd_number/n_seq*100, 
-               fwd_mismatch_0_pct = sum(fwd_mismatch_number==0, na.rm = TRUE)/fwd_number*100,
-               fwd_mismatch_1_pct = sum(fwd_mismatch_number==1, na.rm = TRUE)/fwd_number*100,
-               fwd_mismatch_2_pct = sum(fwd_mismatch_number==2, na.rm = TRUE)/fwd_number*100,
-               fwd_mismatch_pos = mean(fwd_mismatch_primer_position_5prime, na.rm=TRUE),
-               rev_number = sum(!is.na(rev_pos)),
-               rev_pct = rev_number/n_seq*100,
-               rev_mismatch_0_pct = sum(rev_mismatch_number==0, na.rm = TRUE)/rev_number*100,
-               rev_mismatch_1_pct = sum(rev_mismatch_number==1, na.rm = TRUE)/rev_number*100,
-               rev_mismatch_2_pct = sum(rev_mismatch_number==2, na.rm = TRUE)/rev_number*100,
-               rev_mismatch_pos = mean(rev_mismatch_primer_position_5prime, na.rm=TRUE),
-               ampli_number = sum(!is.na(ampli_size)),
-               ampli_pct = ampli_number/n_seq*100, 
-               ampli_size_mean = mean(ampli_size, na.rm=TRUE),
-               ampli_size_sd = sd(ampli_size, na.rm=TRUE),
-               ampli_size_max = max(ampli_size, na.rm=TRUE),
-               ampli_size_min = min(ampli_size, na.rm=TRUE),
-               ampli_mismatch_0_pct = sum(mismatch_number==0, na.rm = TRUE)/n_seq*100,
-               ampli_mismatch_1_pct = sum(mismatch_number==1, na.rm = TRUE)/n_seq*100,
-               ampli_mismatch_2_pct = sum(mismatch_number==2, na.rm = TRUE)/n_seq*100,
-               ampli_mismatch_3_pct = sum(mismatch_number==3, na.rm = TRUE)/n_seq*100,
-               ampli_mismatch_4_pct = sum(mismatch_number==4, na.rm = TRUE)/n_seq*100,
-               ampli_mismatch_5_pct = sum(is.na(mismatch_number), na.rm = TRUE)/n_seq*100) %>% 
-    mutate(across(contains(c("mismatch", "mean")), ~ ifelse(is.nan(.x), NA, .x)))%>% 
-    mutate(across(contains(c("size")), ~ ifelse(is.infinite(.x), NA, .x)))%>% 
-    ungroup()
-
-# Compute the position of the primer for nearly complete sequences
-summary_pos <-  pr2_match  %>% 
-    filter(sequence_length>= sequence_length_min_V9) %>% 
-    group_by({{taxo_level}}, primer_set_id ) %>% 
-    summarize (fwd_pos_mean = mean(fwd_pos, na.rm=TRUE),
-               rev_pos_mean = mean(rev_pos, na.rm=TRUE)) %>% 
-    ungroup()
-
-summary <- summary %>% 
-  left_join(summary_pos) 
-  
-}
-```
+# Read the summarized tables
 
 
-## Summarize all eukaryotes
-
-```{r summary_euks, warning=FALSE , eval=TRUE}
-
-  pr2_match_summary_primer_set <- primer_summary(pr2_match_final, kingdom)
-
-```
-
-## Summarize per supergroup
-
-```{r summary_supergroups, warning=FALSE, eval=TRUE}
-
-  pr2_match_summary_primer_set_sg <- primer_summary(pr2_match_final, supergroup)
-
-```
-
-## Summarize per class 
-
-```{r summary_class, warning=FALSE, eval=TRUE}
-
-  pr2_match_summary_primer_set_class <- primer_summary(pr2_match_final, class) 
-
-  pr2_taxo <- pr2_match_final %>% 
-    select(supergroup, division, class) %>% 
-    distinct()
-  
-  pr2_match_summary_primer_set_class <- pr2_match_summary_primer_set_class %>% 
-    left_join(pr2_taxo) %>% 
-    relocate(supergroup, division, .before = class)
- 
-  
-```
-## Save summaries
-
-```{r, eval=TRUE}
-  saveRDS(pr2_match_summary_primer_set, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
-  saveRDS(pr2_match_summary_primer_set_sg, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_sg.rds"))
-  saveRDS(pr2_match_summary_primer_set_class, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds"))
-  
-  # Shiny
-  # saveRDS(pr2_match_summary_primer_set, file=str_c("../shiny/data/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
-
-```
-
-## Read summaries
 ```{r}
 
  pr2_match_summary_primer_set <- readRDS(file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
@@ -419,6 +235,236 @@ summary <- summary %>%
     tidyr::pivot_longer(names_to="pct_category", values_to = "pct_seq", cols = fwd_pct:ampli_pct) %>% 
     left_join(pct_category_order) 
 ```
+# Tables
+
+## Path for tables
+
+```{r}
+table_path = "C:/daniel.vaulot@gmail.com/Papers/2020 Vaulot primers/paper-primers-overleaf-1.0/tables/"
+```
+
+
+## Primers
+
+```{r}
+table_primers <- primers %>% 
+  mutate(specific = ifelse(is.na(specificity), "general", "specific")) %>% 
+  filter(!str_detect(specificity, "blocking") | is.na(specificity)) %>%
+  relocate(specific, .before = specificity) %>% 
+  group_by(direction, specific) %>% 
+  count() %>% 
+  arrange(-n) %>% 
+  tidyr::pivot_wider(names_from= specific,
+                     values_from = n)
+```
+
+## Primers sets
+
+```{r}
+table_primer_sets <- primer_sets %>% 
+  group_by(gene_region, specific) %>% 
+  count() %>% 
+  arrange(gene_region) %>% 
+  tidyr::pivot_wider(names_from= specific,
+                     values_from = n) %>% 
+  relocate(general, .before = specific)
+```
+
+
+## Primer sets statistics
+
+```{r}
+table_primer_sets_ampli <- pr2_match_summary_primer_set %>% 
+  filter(kingdom == "Eukaryota") %>% 
+  group_by(specific) %>% 
+  summarise(across(.cols = all_of(c("fwd_pct", "rev_pct", "ampli_pct", "ampli_size_mean")),
+            .fns = list(min = min, mean = mean, max = max))) %>% 
+  tidyr::pivot_longer(cols = matches("min|max|mean"), 
+               names_to = "parameter",
+               values_to = "values") %>% 
+  tidyr::pivot_wider(names_from= specific,
+                     values_from = values)
+```
+## Save to Excel file
+
+```{r, eval=FALSE}
+  onglets = list( "table_primers" = table_primers,
+                  "table_primer_sets" = table_primer_sets,
+                  "table_primer_sets_ampli" = table_primer_sets_ampli
+                  )
+  file_name <- str_c(table_path, "tables_R.xlsx")
+  openxlsx::write.xlsx(onglets, file_name, zoom = 90, firstRow = TRUE, firstCol = TRUE)
+
+```
+
+## Export to Latex tables
+
+```{r}
+
+library(xtable)
+```
+
+### Define function to format the tables
+* Not used 
+    * "X" = "\\\\cellcolor{gray}"
+```{r, eval=FALSE}
+sanitize.italics <- function(str) {
+  str_replace_all(str, c("_" = " ", 
+                         # "ital\\{" = "\\\\textit{", 
+                         "Â°" = "\\\\degree",
+                         "±"="$\\pm$"))
+}
+
+
+# See: https://www.rdocumentation.org/packages/xtable/versions/1.8-4/topics/print.xtable
+
+latex_table <- function(table, caption, label, file, align, 
+                        scalebox = getOption("xtable.scalebox", NULL), 
+                        digits = 0, 
+                        add.to.row = getOption("xtable.add.to.row", NULL),
+                        include.colnames = TRUE, 
+                        tabular.environment = getOption("xtable.tabular.environment", "tabular") ) {
+  
+    table <- xtable::xtable(table,
+                            label=label,
+                            caption=caption,
+                            align = align,
+                            digits=digits)
+    print(table,  scalebox = scalebox,
+          caption.placement = "top",
+          include.rownames = FALSE,
+          add.to.row = add.to.row,
+          include.colnames = include.colnames, 
+          tabular.environment = tabular.environment,
+          file=file,
+          sanitize.text.function = sanitize.italics)
+    }
+```
+
+### File path
+
+```{r, eval=FALSE}
+full_file_name <- function(file_name) {str_c(table_path, file_name)}
+
+```
+
+
+### Table - Primers
+```{r, eval=FALSE}
+
+
+latex_table(table = table_primers,
+            caption = "Number of primers listed in the pr2-primer database",
+            label = "tab:primers",
+            file = full_file_name("table_primers.tex"),
+            align = c("l","c","c", "c"),
+            scalebox = 1,
+            digits= 0
+)
+
+```
+
+### Table - Primer sets
+```{r, eval=FALSE}
+
+latex_table(table = table_primer_sets,
+            caption = "Number of primer sets listed in the pr2-primer database",
+            label = "tab:primer_sets",
+            file = full_file_name("table_primer_sets.tex"),
+            align = c("l","l","c", "c"),
+            scalebox = 1,
+            digits= 0
+)
+
+```
+
+### Table - Primer sets stats
+```{r, eval=FALSE}
+
+
+
+latex_table(table = table_primer_sets_ampli,
+            caption = "Overall characteristics of primer sets listed in the PR2 primer database",
+            label = "tab:primer_sets_ampli",
+            file = full_file_name("table_primer_sets_ampli.tex"),
+            align = c("l","l","c", "c"),
+            scalebox = 1,
+            digits= 1
+)
+
+```
+
+## Supplementary Table - Primers
+```{r, eval=FALSE}
+
+table <- primers %>% 
+  select(primer_id, name, sequence, direction, start_yeast, specificity, doi)
+ 
+add.to.row <- list()
+add.to.row$pos <- list(0, 0, 0, 0, 0)
+add.to.row$command <- c( 
+  # Header for first page
+  "id & Name & Sequence & Direction & Start (yeast) & Specificity & DOI \\\\\n",
+  "\\endfirsthead \n \\hline \n",
+  
+  # Header for other pages
+  "id & Name & Sequence & Direction & Start (yeast) & Specificity & DOI \\\\\n",
+  "\\hline \n \\endhead \n",
+  
+  # Footers
+  "\\hline \n \\endfoot \n  \\endlastfoot \n"
+)
+
+
+latex_table(table = table,
+            caption = "List of primers in the pr2-primer database. The start position is relative to the sequence of the yeast Saccharomyces cerevisiae (FU970071).",
+            label = "tabsup:primers",
+            file = full_file_name("table_sup_primers.tex"),
+            align = c("l","l","l", "l","l","l","l", "l" ),
+            digits= 0,
+            add.to.row = add.to.row,
+            include.colnames = FALSE, 
+            tabular.environment = "longtable"
+)
+
+
+```
+## Supplementary Table - Primer sets
+```{r, eval=FALSE}
+
+table <- primer_sets %>% 
+  select(primer_set_id, primer_set_name, fwd_name, rev_name, gene_region, specificity, doi) %>% 
+  arrange(primer_set_id)
+ 
+add.to.row <- list()
+add.to.row$pos <- list(0, 0, 0, 0, 0)
+add.to.row$command <- c( 
+  # Header for first page
+  "id & Name & Primer fwd & Primer rev & Region & Specificity & DOI \\\\\n",
+  "\\endfirsthead \n \\hline \n",
+  
+  # Header for other pages
+  "id & Name & Primer fwd & Primer rev & Region & Specificity & DOI \\\\\n",
+  "\\hline \n \\endhead \n",
+  
+  # Footers
+  "\\hline \n \\endfoot \n  \\endlastfoot \n"
+)
+
+
+latex_table(table = table,
+            caption = "List of primer sets in the pr2-primer database",
+            label = "tabsup:primer_sets",
+            file = full_file_name("table_sup_primer_sets.tex"),
+            align = c("l","l","l", "l","l","l","l", "l" ),
+            digits= 0,
+            add.to.row = add.to.row,
+            include.colnames = FALSE, 
+            tabular.environment = "longtable"
+)
+
+
+```
 
 
 # Graphics
@@ -427,7 +473,7 @@ summary <- summary %>%
 
 ```{r}
 
-ncol = 6
+ncol = 8
   
 fig3 <- list()
 
@@ -440,7 +486,7 @@ fig3 <- list()
 
 ```{r amplicon_length, fig.height=10, fig.width=15}
 
- ggplot(pr2_match_final,
+ ggplot(filter(pr2_match_final, kingdom = "Eukaryota"),
         aes(x = primer_set_label_short,
             y = ampli_size,
             group = primer_set_id,
@@ -460,7 +506,7 @@ fig3 <- list()
 ```{r amplicon_length_average, fig.height=10, fig.width=15}
 
 ggplot(
-  pr2_match_final,
+  filter(pr2_match_final, kingdom = "Eukaryota"),
   aes(
     x = primer_set_label_short,
     y = ampli_size,
@@ -482,14 +528,14 @@ ggplot(
 
 ```{r amplicon_length_histogram, fig.height=6, fig.width=10}
 
-for (one_primer_set in c(4, 29)){
+for (one_primer_set in c(8, 27)){
   
-  if (one_primer_set == 4 ) {
-    xmin=570
-    xmax = 610
+  if (one_primer_set == 8 ) {
+    xmin=400
+    xmax = 450
     xmax2 = 2000
   } else {
-    xmin=130
+    xmin=140
     xmax = 190
     xmax2 = 1000
     
@@ -497,6 +543,7 @@ for (one_primer_set in c(4, 29)){
   
   pr2_match_final_one <- pr2_match_final %>% 
     filter(primer_set_id==one_primer_set) %>% 
+    filter(kingdom == "Eukaryota") %>% 
     filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X", "Protoalveoalata") ))
   
   primer_set_label_long = pr2_match_final_one$primer_set_label_long[1]
@@ -532,7 +579,8 @@ for (one_primer_set in c(4, 29)){
     coord_flip()+
     # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
     xlab("Supergroup") + ylab("Amplicon size (bp)") +
-    ylim(0,xmax2)
+    ylim(0,xmax2) +
+    geom_hline(yintercept = c(450,550), linetype = c(2,3) )
   
   print(g)
   fig3[[str_c(one_primer_set, " size")]] <- g
@@ -554,11 +602,12 @@ for (one_primer_set in c(4, 29)){
 ```{r, fig.height=10, fig.width=10}
 
 
-for (one_primer_set in c(4, 29)) {
+for (one_primer_set in c(8, 27)) {
   
   pr2_match_summary_filtered <- pr2_match_summary_primer_set_sg %>% 
     filter((n_seq > 20) &
            (primer_set_id == one_primer_set) & 
+           (kingdom == "Eukaryota") & 
            !(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
   
 
@@ -613,7 +662,7 @@ for (one_primer_set in c(4, 29)) {
 ```{r, fig.height=10, fig.width=10}
 
 
-for (one_primer_set in c(4, 29)) {
+for (one_primer_set in c(8, 27)) {
   
 pr2_mismatches <- pr2_match_summary_primer_set_sg %>% 
   tidyr::pivot_longer(names_to="mismatch_number", 
@@ -625,6 +674,7 @@ pr2_mismatches <- pr2_match_summary_primer_set_sg %>%
   mutate(mismatch_number = str_replace(mismatch_number,"5" , "5+")) %>% 
     filter((n_seq > 20) &
            (primer_set_id == one_primer_set) & 
+           (kingdom == "Eukaryota") &  
            !(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
   
 g <- ggplot(pr2_mismatches,
@@ -661,10 +711,11 @@ g <- ggplot(pr2_mismatches,
 ```{r, fig.height=10, fig.width=10}
 
 
-for (one_primer_set in c(4, 29)) {
+for (one_primer_set in c(8, 27)) {
   
   df <- pr2_match_final %>% 
-    filter(primer_set_id == one_primer_set) %>%  
+    filter(primer_set_id == one_primer_set) %>%
+    filter(kingdom == "Eukaryota") %>% 
     filter(!(supergroup %in% c("Apusozoa", "Eukaryota_X") ) )
     
   g <- ggplot() +
@@ -727,160 +778,176 @@ Comments
 
 fig1 <- list()
 
-for (one_region in gene_regions) {
-  
-  pr2_match_summary_primer_set_region_long <- pr2_match_summary_primer_set_long %>% 
-    filter(gene_region== one_region) %>% 
-    # Remove the group specific primers
-      filter(specific == "general") %>% 
-      filter(pct_category %in% c("ampli_pct", "fwd_pct", "rev_pct"))
-  
-  pr2_match_summary_primer_set_region <- pr2_match_summary_primer_set %>% 
-    filter(gene_region== one_region) %>% 
-    # Remove the group specific primers)
-      filter(specific == "general")   
-  
-  pr2_match_region <- pr2_match_final %>% 
-    filter(gene_region == one_region)%>% 
-    # Remove the group specific primers
+for (one_kingdom in kingdoms){
+
+    for (one_region in gene_regions) {
+      
+      pr2_match_summary_primer_set_region_long <- pr2_match_summary_primer_set_long %>% 
+        filter(kingdom == one_kingdom) %>% 
+        filter(gene_region== one_region) %>% 
+        # Remove the group specific primers
+          filter(specific == "general") %>% 
+          filter(pct_category %in% c("ampli_pct", "fwd_pct", "rev_pct"))
+      
+      pr2_match_summary_primer_set_region <- pr2_match_summary_primer_set %>% 
+        filter(kingdom == one_kingdom) %>% 
+        filter(gene_region== one_region) %>% 
+        # Remove the group specific primers)
+          filter(specific == "general")   
+      
+      pr2_match_region <- pr2_match_final %>% 
+        filter(kingdom == one_kingdom) %>% 
+        filter(gene_region == one_region)%>% 
+        # Remove the group specific primers
+          filter(specific == "general")  
+    
+    # % Ampli  
+      
+      g <- ggplot(pr2_match_summary_primer_set_region_long) + 
+        geom_col(aes(x= str_replace(str_c(sprintf("%03d", primer_set_id), primer_set_label_long, sep = " - "), " - general", ""),
+                     y=pct_seq, 
+                     fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
+        theme_bw() +
+        xlab("Primer set") + ylab("% of sequences amplified") + 
+        scale_fill_manual(name = "",  
+                          values = c("ampli_pct" = "black", "fwd_pct" = "blue","rev_pct" = "red"), 
+                          labels=c( "Amplicons", "rev", "fwd")) +
+        ggtitle (str_c(one_kingdom, one_region, "Percentage of sequences recovered", sep = " - "))+
+        theme(axis.text.x = element_text(angle = 0, hjust = 1))+
+        theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
+        ylim(0,100) +
+        coord_flip() + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "top", legend.box = "horizontal")
+      
+      print(g)
+      
+    # Size
+      
+      fig1[[str_c(one_kingdom, one_region, "pct", sep = " ")]] <- g
+    
+    
+       g <- ggplot(filter(pr2_match_summary_primer_set_region, !is.nan(ampli_size_mean))) + 
+        geom_point(aes(x=str_c(sprintf("%03d", primer_set_id), primer_set_label_long, sep = " - "),
+                       y=ampli_size_mean), colour="black") +
+        geom_errorbar(aes(x=str_c(sprintf("%03d", primer_set_id), primer_set_label_long, sep = " - "), 
+                          ymax=ampli_size_mean + ampli_size_sd, 
+                          ymin=ampli_size_mean - ampli_size_sd)) +
+        theme_bw() +
+        xlab("Primer set") + ylab("Amplicon size (bp)") +
+        # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+        ggtitle (str_c(one_kingdom, one_region, "Amplicon size", sep = " - ") ) +
+        geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
+        ylim(0,850) + 
+        theme(axis.text.x = element_text(angle = 0, hjust = 1))+
+        theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) + 
+        coord_flip()  
+       
+      print(g)
+       
+      fig1[[str_c(one_kingdom, one_region, "size", sep = " ")]] <- g
+      
+    # Mismatches
+      
+      pr2_mismatches <- pr2_match_summary_primer_set %>% 
+      filter(kingdom == one_kingdom) %>% 
+      tidyr::pivot_longer(names_to="mismatch_number", 
+                          values_to = "mismatch_pct", 
+                          cols = contains("ampli_mismatch"),
+                          names_prefix = "ampli_mismatch_") %>% 
+      select(-contains("ampli_mismatch")) %>% 
+      mutate(mismatch_number = str_sub(mismatch_number,1 , 1)) %>% 
+      mutate(mismatch_number = str_replace(mismatch_number,"5" , "5+")) %>% 
+      filter(gene_region == one_region)%>% 
+      # Remove the group specific primers
       filter(specific == "general")  
-
-# % Ampli  
-  
-  g <- ggplot(pr2_match_summary_primer_set_region_long) + 
-    geom_col(aes(x= primer_set_label_long, y=pct_seq, 
-                 fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
-    theme_bw() +
-    xlab("Primer set") + ylab("% of sequences amplified") + 
-    scale_fill_manual(name = "",  values = c("ampli_pct" = "black", "fwd_pct" = "grey80","rev_pct" = "grey40"), 
-                      labels=c( "Amplicons", "Primer rev", "Primer fwd")) +
-    ggtitle (str_c(one_region, " - Percentage of sequences recovered"))+
-    theme(axis.text.x = element_text(angle = 0, hjust = 1))+
-    theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
-    ylim(0,100) +
-    coord_flip() + 
-    guides(fill = guide_legend(nrow = 1)) +
-    theme(legend.position = "top", legend.box = "horizontal")
-  
-  print(g)
-  
-# Size
-  
-  fig1[[str_c(one_region, "pct", sep = " ")]] <- g
-
-
-   g <- ggplot(filter(pr2_match_summary_primer_set_region, !is.nan(ampli_size_mean))) + 
-    geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
-    geom_errorbar(aes(x=primer_set_label_short, 
-                      ymax=ampli_size_mean + ampli_size_sd, 
-                      ymin=ampli_size_mean - ampli_size_sd)) +
-    theme_bw() +
-    xlab("Primer set") + ylab("Amplicon size (bp)") +
-    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
-    ggtitle (str_c(one_region, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
-    geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
-    ylim(0,850) + 
-    theme(axis.text.x = element_text(angle = 0, hjust = 1))+
-    theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) + 
-    coord_flip()  
-   
-  print(g)
-   
-  fig1[[str_c(one_region, "size", sep = " ")]] <- g
-  
-# Mismatches
-  
-  pr2_mismatches <- pr2_match_summary_primer_set %>% 
-  tidyr::pivot_longer(names_to="mismatch_number", 
-                      values_to = "mismatch_pct", 
-                      cols = contains("ampli_mismatch"),
-                      names_prefix = "ampli_mismatch_") %>% 
-  select(-contains("ampli_mismatch")) %>% 
-  mutate(mismatch_number = str_sub(mismatch_number,1 , 1)) %>% 
-  mutate(mismatch_number = str_replace(mismatch_number,"5" , "5+")) %>% 
-  filter(gene_region == one_region)%>% 
-  # Remove the group specific primers
-  filter(specific == "general")  
-  
-g <- ggplot(pr2_mismatches,
-          aes(x = primer_set_label_short,
-              y = mismatch_pct,
-              group = primer_set_id,
-              fill = as.factor(mismatch_number)
-             )
-          ) +
-  geom_col() +
-  theme_bw()  +
-  theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
-  labs(x = "Primer set",
-       y = "% of sequences with mismatches",
-       fill = "Mismatches") +
-  scale_fill_viridis_d(direction = -1, alpha=0.85) + 
-  guides(fill = guide_legend(nrow = 1)) +
-  theme(legend.position = "top", legend.box = "horizontal") +
-  coord_flip() 
-  
- print(g)
- 
- fig1[[str_c(one_region, "mismatches", sep = " ")]] <- g
-
-  
-    }
-
+      
+    g <- ggplot(pr2_mismatches,
+              aes(x = str_c(sprintf("%03d", primer_set_id), primer_set_label_long, sep = " - "),
+                  y = mismatch_pct,
+                  group = primer_set_id,
+                  fill = as.factor(mismatch_number)
+                 )
+              ) +
+      geom_col() +
+      theme_bw()  +
+      theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
+      labs(x = "Primer set",
+           y = "% of sequences with mismatches",
+           fill = "Mismatches",
+           title =  str_c(one_kingdom, one_region , sep = " - ") ) +
+      scale_fill_viridis_d(direction = -1, alpha=0.85) + 
+      guides(fill = guide_legend(nrow = 1)) +
+      theme(legend.position = "top", legend.box = "horizontal") +
+      coord_flip() 
+      
+     print(g)
+     
+     fig1[[str_c(one_kingdom, one_region, "mismatches", sep = " ")]] <- g
+    
+      
+        }
+}
 ```
 
 ### Plot all with panel general and specific
 
 ```{r , fig.height=10, fig.width=6}
 
-for (specific_one in c("general", "specific")) {
-  
-  df <- pr2_match_summary_primer_set_long %>% 
-      filter(pct_category %in% c("ampli_pct", "fwd_pct", "rev_pct")) %>% 
-      filter(specific == specific_one)
+for (one_kingdom in kingdoms){
 
-  g <- ggplot(df) + 
-    geom_col(aes(x=primer_set_label_long, y=pct_seq, 
-                 fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
-    theme_bw() +
-    xlab("Primer set") + ylab("% of sequences amplified") + 
-    scale_fill_manual(name = "",  values = c("ampli_pct" = "black", "fwd_pct" = "grey80","rev_pct" = "grey40"), 
-                      labels=c( "Amplicons", "Primer rev", "Primer fwd")) +
-    ggtitle (str_c(specific_one, " - Percentage of sequences recovered")) +
-    theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0)) +
-    ylim(0,100) +
-    coord_flip() + 
-    guides(fill = guide_legend(nrow = 1)) +
-    theme(legend.position = "top", legend.box = "horizontal") 
+    for (specific_one in c("general", "specific")) {
+      
+      df <- pr2_match_summary_primer_set_long %>% 
+        filter(kingdom == one_kingdom)%>% 
+          filter(pct_category %in% c("ampli_pct", "fwd_pct", "rev_pct")) %>% 
+          filter(specific == specific_one)
     
-  
-  print(g)
-  
-  fig1[[str_c(specific_one, "pct", sep = " ")]] <- g
-
-  df <- pr2_match_summary_primer_set %>% 
-      filter(!is.nan(ampli_size_mean)) %>%  
-      filter(specific == specific_one)
-  
-  g <- ggplot(df) + 
-    geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
-    geom_errorbar(aes(x=primer_set_label_long, 
-                      ymax=ampli_size_mean + ampli_size_sd, 
-                      ymin=ampli_size_mean - ampli_size_sd)) +
-    theme_bw() +
-    xlab("Primer set") + ylab("Amplicon size (bp)") +
-    # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
-    ggtitle (str_c(specific_one, " - Amplicon size - Lines correspond to limits for Illumina 2x250 and 2x300 respectively") ) +
-    geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
-    ylim(0,850) + 
-    theme(axis.text.y = element_text(angle = 0, hjust = 0)) + 
-    coord_flip()   
-   
-  print(g)
-   
-  fig1[[str_c(specific_one, "size", sep = " ")]] <- g
-  
-}  
+      g <- ggplot(df) + 
+        geom_col(aes(x=str_replace(str_c(primer_set_label_long, sprintf("%03d", primer_set_id), sep = " - "), " - general", ""), 
+                     y=pct_seq, 
+                     fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
+        theme_bw() +
+        xlab("Primer set") + ylab("% of sequences amplified") + 
+        scale_fill_manual(name = "",  values = c("ampli_pct" = "black", "fwd_pct" = "blue","rev_pct" = "red"), 
+                          labels=c( "Amplicons", "rev", "fwd")) +
+        ggtitle (str_c(one_kingdom, specific_one, "Percentage of sequences recovered", sep = " - ")) +
+        theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0)) +
+        ylim(0,100) +
+        coord_flip() + 
+        guides(fill = guide_legend(nrow = 1)) +
+        theme(legend.position = "top", legend.box = "horizontal") 
+        
+      
+      print(g)
+      
+      fig1[[str_c(one_kingdom, specific_one, "pct", sep = " ")]] <- g
+    
+      df <- pr2_match_summary_primer_set %>% 
+          filter(kingdom == one_kingdom)%>% 
+          filter(!is.nan(ampli_size_mean)) %>%  
+          filter(specific == specific_one)
+      
+      g <- ggplot(df) + 
+        geom_point(aes(x=str_c(primer_set_label_long, sprintf("%03d", primer_set_id), sep = " - "), y=ampli_size_mean), colour="black") +
+        geom_errorbar(aes(x=str_c(primer_set_label_long, sprintf("%03d", primer_set_id), sep = " - "), 
+                          ymax=ampli_size_mean + ampli_size_sd, 
+                          ymin=ampli_size_mean - ampli_size_sd)) +
+        theme_bw() +
+        xlab("Primer set") + ylab("Amplicon size (bp)") +
+        # scale_y_continuous(breaks = (1:8)*200, limits = c(0,1500)) +
+        ggtitle (str_c(one_kingdom, specific_one, " - Amplicon size", sep = " - ") ) +
+        geom_hline(yintercept = c(450,550), linetype = c(2,3) ) +
+        ylim(0,900) + 
+        theme(axis.text.y = element_text(angle = 0, hjust = 0)) + 
+        coord_flip()   
+       
+      print(g)
+       
+      fig1[[str_c(one_kingdom, specific_one, "size", sep = " ")]] <- g
+      
+    }  
+}
 
 ```
 
@@ -890,51 +957,58 @@ for (specific_one in c("general", "specific")) {
 
 ```{r fig.height=10, fig.width=10}
 
-for (specific_one in c("general", "specific")) {
-  
-pr2_mismatches <- pr2_match_summary_primer_set %>% 
-  tidyr::pivot_longer(names_to="mismatch_number", 
-                      values_to = "mismatch_pct", 
-                      cols = contains("ampli_mismatch"),
-                      names_prefix = "ampli_mismatch_") %>% 
-  select(-contains("ampli_mismatch")) %>% 
-  mutate(mismatch_number = str_sub(mismatch_number,1 , 1)) %>% 
-  mutate(mismatch_number = str_replace(mismatch_number,"5" , "5+")) %>% 
-  filter(specific == specific_one)
-  
-g <- ggplot(pr2_mismatches,
-          aes(x = primer_set_label_long,
-              y = mismatch_pct,
-              group = primer_set_id,
-              fill = as.factor(mismatch_number)
-             )
-          ) +
-  geom_col() +
-  theme_bw()  +
-  theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
-  labs(x = "Primer set",
-       y = "% of sequences with mismatches",
-       fill = "Mismatches") +
-  scale_fill_viridis_d(direction = -1, alpha=0.85) + 
-  guides(fill = guide_legend(nrow = 1)) +
-  theme(legend.position = "top", legend.box = "horizontal") +
-  coord_flip() 
-  
- print(g)
- 
- fig1[[str_c(specific_one, "mismatches", sep = " ")]] <- g
- 
- 
-}    
+for (one_kingdom in kingdoms){
+
+  for (specific_one in c("general", "specific")) {
+    
+  pr2_mismatches <- pr2_match_summary_primer_set %>% 
+    tidyr::pivot_longer(names_to="mismatch_number", 
+                        values_to = "mismatch_pct", 
+                        cols = contains("ampli_mismatch"),
+                        names_prefix = "ampli_mismatch_") %>% 
+    select(-contains("ampli_mismatch")) %>% 
+    mutate(mismatch_number = str_sub(mismatch_number,1 , 1)) %>% 
+    mutate(mismatch_number = str_replace(mismatch_number,"5" , "5+")) %>% 
+    filter(specific == specific_one) %>% 
+    filter(kingdom == one_kingdom)
+    
+  g <- ggplot(pr2_mismatches,
+            aes(x = str_c(primer_set_label_long,sprintf("%03d", primer_set_id),  sep = " - "),
+                y = mismatch_pct,
+                group = primer_set_id,
+                fill = as.factor(mismatch_number)
+               )
+            ) +
+    geom_col() +
+    theme_bw()  +
+    theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust=0)) +
+    labs(x = "Primer set",
+         y = "% of sequences with mismatches",
+         fill = "Mismatches",
+         title = str_c(one_kingdom, specific_one, sep = " - ")) +
+    scale_fill_viridis_d(direction = -1, alpha=0.85) + 
+    guides(fill = guide_legend(nrow = 1)) +
+    theme(legend.position = "top", legend.box = "horizontal") +
+    coord_flip() 
+    
+   print(g)
+   
+   fig1[[str_c(one_kingdom, specific_one, "mismatches", sep = " ")]] <- g
+   
+   
+  }
+}
  
 ```
 
-### Position of mismatches
+### Position of mismatches (only for Eukaryota)
+
+
 
 ```{r fig.height=30, fig.width=30}
 
 
-  ggplot(pr2_match_final, aes(x = primer_set_label_long)) +
+  ggplot(filter(pr2_match_final, kingdom == "Eukaryota"), aes(x = primer_set_label_long)) +
     geom_boxplot(aes(y = fwd_mismatch_primer_position_5prime),
                      outlier.alpha = 0.3,
                      color = "blue") +
@@ -947,7 +1021,7 @@ g <- ggplot(pr2_mismatches,
          title = "Primer fwd") +
   facet_wrap(vars(specific), nrow = 2, scales = "free_y")
   
-  ggplot(pr2_match_final, aes(x = primer_set_label_long)) +
+  ggplot(filter(pr2_match_final, kingdom == "Eukaryota"), aes(x = primer_set_label_long)) +
     geom_boxplot(aes(y = rev_mismatch_primer_position_5prime),
                      outlier.alpha = 0.3,
                      color = "red") +
@@ -960,7 +1034,7 @@ g <- ggplot(pr2_mismatches,
          title = "Primer rev") +
   facet_wrap(vars(specific), nrow = 2, scales = "free_y")
   
-  ggplot(filter(pr2_match_final, !is.na(rev_mismatch_primer_position_5prime))) +
+  ggplot(filter(pr2_match_final, !is.na(rev_mismatch_primer_position_5prime), kingdom == "Eukaryota")) +
     geom_histogram(aes(x = rev_mismatch_primer_position_5prime),
                    color = "red",
                    binwidth = 1,
@@ -973,9 +1047,9 @@ g <- ggplot(pr2_mismatches,
   facet_wrap(vars(primer_set_label_long), ncol = ncol)
  
 ```
-## By supergroup
+## By supergroup (only for Eukaryota)
 
-Comments
+Comments:
 
 * Excavata have a very different patterns from the rest of the group. They are not amplified by quite a few primer sets. They have also bigger amplicons
 * Some groups exhibit higher variability in amplicon size (e.g Chlorophyta)
@@ -985,10 +1059,12 @@ Comments
 ```{r graph_supergroup, fig.height=20, fig.width=12}
 
   fig_supergroup <- list()  
+ncol = 8
 
 for (specific_one in c("general", "specific")) {
 
   pr2_match_summary_primer_set_sg_region <- pr2_match_summary_primer_set_sg %>% 
+    filter(kingdom == "Eukaryota") %>% 
     filter(specific == specific_one) %>% 
     filter((n_seq > 20) ) %>% 
     filter( !(supergroup %in% c("Apusozoa", "Eukaryota_X") ))
@@ -1043,13 +1119,14 @@ for (specific_one in c("general", "specific")) {
 }
 ```
 
-### Number of mismatches
+### Number of mismatches (Only Eukaryotes)
 
 ```{r fig.height=20, fig.width=20}
 
-
+ncol = 8
 
 pr2_mismatches_sg <- pr2_match_summary_primer_set_sg %>% 
+  filter(kingdom == "Eukaryota") %>% 
   tidyr::pivot_longer(names_to="mismatch_number", 
                       values_to = "mismatch_pct", 
                       cols = contains("ampli_mismatch"),
@@ -1091,12 +1168,13 @@ for (specific_one in c("general", "specific")) {
  
 ```
 
-## By class for autotrophs
+## By class for autotrophs (Only EUkaryotes)
 
 
 ```{r graph_class, fig.height=30, fig.width=20}
 
 fig_class <- list()
+ncol = 8
 
 for (specific_one in c("general", "specific")) {
 
@@ -1109,18 +1187,18 @@ for (specific_one in c("general", "specific")) {
   g <- ggplot(pr2_match_summary_filtered_one) + 
     geom_col(aes(x=str_c(str_trunc(division, 20, ellipsis = ""), "-", class), 
                  y=ampli_pct, 
-                 fill = class), 
+                 fill = division), 
              position="dodge") +
     theme_bw() +
     coord_flip() + 
     ylab("% of sequences amplified") + xlab("Class") +
     theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0))  +
-    scale_fill_viridis_d(option = "inferno") +
+    # scale_fill_viridis_d(option = "plasma") +
+    scale_fill_brewer(palette = "Accent") + 
     ylim(0,100) +
     facet_wrap(vars(primer_set_label_short), scales ="fixed", ncol = ncol) + 
     guides(fill = guide_legend(nrow = 1)) +
-    theme(legend.position = "top", legend.box = "horizontal")+ 
-    theme(legend.position="none")
+    theme(legend.position = "top", legend.box = "horizontal")
 
   print(g)
   
@@ -1205,29 +1283,6 @@ for (one_primer_set in c(16, 17, 35)) {
 }
 ```
 
-# Tables
-
-## Table 1 and Supplementary tables
-
-```{r, eval=TRUE}
-  if(gene_selected == "18S_rRNA") file_name_xls = "../output/primers 18S.xlsx"
-
-  sheets = list( `Table 1`= primer_sets,
-                `Summary Eukaryotes`= pr2_match_summary_primer_set,
-                `Summary Supergroup`= pr2_match_summary_primer_set_sg,
-                `Summary Class`= pr2_match_summary_primer_set_class)
-
-
-  excel_style  <- openxlsx::createStyle(numFmt = "0.00")
-  openxlsx::write.xlsx(sheets,
-                       file = file_name_xls,
-                       zoom = 80,
-                       firstActiveRow=2,
-                       firstActiveCol=6,
-                       colWidths = "auto")
-```
-
-
 
 # Figures
 
@@ -1238,108 +1293,111 @@ library(patchwork)
 
 ## Fig. 1 - V4 and V9 - Amplification % and size
 
+### Eukaryota
+
 ```{r,  fig.height=12, fig.width=12, eval=TRUE}
 
-# legend_pct <- cowplot::get_legend( fig1[["V4 pct"]] + 
-#                       # create some space to the left of the legend    
-#                       theme(legend.box.margin = margin(0, 0, 0, 20))
-#                     )
-# 
-# legend_mismatches <- cowplot::get_legend( fig1[["V4 mismatches"]] + 
-#                       # create some space to the left of the legend    
-#                       theme(legend.box.margin = margin(0, 0, 0, 20))
-#                     )
-# 
-# fig_1 <- cowplot::plot_grid(legend_pct,legend_mismatches, NULL,
-#                             fig1[["V4 pct"]]  +ggtitle("")+ theme(legend.position="none") + ylab(""),
-#                             fig1[["V4 mismatches"]] +ggtitle("")+ 
-#                               theme(legend.position="none") + 
-#                               xlab("") + ylab("") + 
-#                               theme(axis.text.y = element_blank()) , 
-#                             fig1[["V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
-#                               theme(axis.text.y = element_blank()),
-#                             fig1[["V9 pct"]]  +ggtitle("")+ theme(legend.position="none"),  
-#                             fig1[["V9 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
-#                               theme(axis.text.y = element_blank()), 
-#                             fig1[["V9 size"]] +ggtitle("") + xlab("")+ 
-#                               theme(axis.text.y = element_blank()), 
-#                    labels = c("","","","A","","", "B","",""), label_size = 22, label_x = 0.05,
-#                    ncol = 3, nrow = 3, align = "hv", 
-#                    rel_heights = c(1,20,6), rel_widths = c(18,12,12) )
-# 
-# 
-# fig_1
 
-fig_1 <-( fig1[["V4 pct"]]  +ggtitle("")+ ylab("") +
-          fig1[["V4 mismatches"]] +ggtitle("") +
+fig_1 <-( fig1[["Eukaryota V4 pct"]]  +ggtitle("")+ ylab("") +
+          fig1[["Eukaryota V4 mismatches"]] +ggtitle("") +
             xlab("") + ylab("") + 
             theme(axis.text.y = element_blank()) + 
-          fig1[["V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
+          fig1[["Eukaryota V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
             theme(axis.text.y = element_blank())
           )/(
-          fig1[["V9 pct"]]  +ggtitle("")+ theme(legend.position="none")+  
-          fig1[["V9 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
+          fig1[["Eukaryota V9 pct"]]  +ggtitle("")+ theme(legend.position="none")+  
+          fig1[["Eukaryota V9 mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
             theme(axis.text.y = element_blank())+ 
-          fig1[["V9 size"]] +ggtitle("") + xlab("")+ 
+          fig1[["Eukaryota V9 size"]] +ggtitle("") + xlab("")+ 
             theme(axis.text.y = element_blank())
           ) +plot_layout(heights = c(20, 4))
 fig_1
 
-ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_V4_V9.pdf",
-           width = 12 , height = 12, scale=1.75, units="cm", useDingbats=FALSE)
+ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_V4_V9_euk.pdf",
+           width = 17 , height = 12, scale=2, units="cm", useDingbats=FALSE)
 
 
 
 ```
+
+### Bacteria
+
+```{r,  fig.height=12, fig.width=12, eval=TRUE}
+
+
+fig_1_bact <-( fig1[["Bacteria V4 pct"]]  +ggtitle("")+ ylab("") +
+          fig1[["Bacteria V4 mismatches"]] +ggtitle("") +
+            xlab("") + ylab("") + 
+            theme(axis.text.y = element_blank()) + 
+          fig1[["Bacteria V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
+            theme(axis.text.y = element_blank())
+          )
+fig_1_bact
+
+ggsave(plot= fig_1_bact , filename="../figs/fig_pct_sizes_mismatches_V4_bact.pdf",
+           width = 17 , height = 10, scale=2, units="cm", useDingbats=FALSE)
+
+
+
+```
+
+### Archaea
+
+```{r,  fig.height=12, fig.width=12, eval=TRUE}
+
+
+fig_1_arch <-( fig1[["Archaea V4 pct"]]  +ggtitle("")+ ylab("") +
+          fig1[["Archaea V4 mismatches"]] +ggtitle("") +
+            xlab("") + ylab("") + 
+            theme(axis.text.y = element_blank()) + 
+          fig1[["Archaea V4 size"]] +ggtitle("") + xlab("") + ylab("")+ 
+            theme(axis.text.y = element_blank())
+          )
+fig_1_arch
+
+ggsave(plot= fig_1_arch , filename="../figs/fig_pct_sizes_mismatches_V4_arch.pdf",
+           width = 17 , height = 10, scale=2, units="cm", useDingbats=FALSE)
+
+
+
+```
+
 
 ## Fig. 1 - All - Amplification % and size and mismatches
 
 ```{r,  fig.height=12, fig.width=12, eval=TRUE}
 
 
-legend_pct <- cowplot::get_legend( fig1[["general pct"]] + 
+legend_pct <- cowplot::get_legend( fig1[["Eukaryota general pct"]] + 
                       # create some space to the left of the legend    
                       theme(legend.box.margin = margin(0, 0, 0, 20))
                     )
 
-legend_mismatches <- cowplot::get_legend( fig1[["general mismatches"]] + 
+legend_mismatches <- cowplot::get_legend( fig1[["Eukaryota general mismatches"]] + 
                       # create some space to the left of the legend    
                       theme(legend.box.margin = margin(0, 0, 0, 20))
                     )
 
-fig_1 <- cowplot::plot_grid(legend_pct, legend_mismatches, NULL,
-                            fig1[["general pct"]]  +ggtitle("")+ theme(legend.position="none") + ylab(""),
-                            fig1[["general mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("") + ylab(""), 
-                            fig1[["general size"]] +ggtitle("") + xlab("") + ylab(""),
-                            fig1[["specific pct"]]  +ggtitle("")+ theme(legend.position="none"), 
-                            fig1[["specific mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab(""), 
-                            fig1[["specific size"]] +ggtitle("") + xlab(""),
-                   labels = c("","","", "A","","", "B","",""), 
-                   label_size = 12, label_x = 0.05,
-                    ncol = 3, nrow = 3, align = "hv", 
-                   rel_heights = c(1,38,26), rel_widths = c(12,12,10) )
-fig_1
 
-
-fig_1 <-( fig1[["general pct"]]  +ggtitle("")+ ylab("") + xlab("") +
-          fig1[["general mismatches"]] +ggtitle("") +
+fig_1 <-( fig1[["Eukaryota general pct"]]  +ggtitle("")+ ylab("") + xlab("") +
+          fig1[["Eukaryota general mismatches"]] +ggtitle("") +
             xlab("") + ylab("") + 
             theme(axis.text.y = element_blank()) + 
-          fig1[["general size"]] +ggtitle("") + xlab("") + ylab("")+ 
+          fig1[["Eukaryota general size"]] +ggtitle("") + xlab("") + ylab("")+ 
             theme(axis.text.y = element_blank())
           )/(
-          fig1[["specific pct"]]  +ggtitle("")+ theme(legend.position="none")+ xlab("")+  
-          fig1[["specific mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
+          fig1[["Eukaryota specific pct"]]  +ggtitle("")+ theme(legend.position="none")+ xlab("")+  
+          fig1[["Eukaryota specific mismatches"]] +ggtitle("")+ theme(legend.position="none") + xlab("")+ 
             theme(axis.text.y = element_blank())+ 
-          fig1[["specific size"]] +ggtitle("") + xlab("")+ 
+          fig1[["Eukaryota specific size"]] +ggtitle("") + xlab("")+ 
             theme(axis.text.y = element_blank())
-          ) +plot_layout(heights = c(38, 26))
+          ) +plot_layout(heights = c(45, 25))
 fig_1
 
 
 
 ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_all.pdf",
-           width = 15 , height = 12, scale=1.75, units="cm", useDingbats=FALSE)
+           width = 19 , height = 17, scale=2, units="cm", useDingbats=FALSE)
 
 
 
@@ -1349,7 +1407,7 @@ ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_all.pdf",
 
 ```{r,  fig.height=9, fig.width=18, eval=TRUE}
 
-legend_mismatches <- cowplot::get_legend( fig3[["4 mismatches"]] + 
+legend_mismatches <- cowplot::get_legend( fig3[["8 mismatches"]] + 
                       # create some space to the left of the legend    
                       theme(legend.box.margin = margin(t = 20, r = 0, b = 20, l = 20))
                     )
@@ -1360,28 +1418,28 @@ legend_size_distri <- cowplot::get_legend( fig3[["4 size_distri"]] +
                     )
 
 
-fig_sub4 <- cowplot::plot_grid(fig3[["4 mismatches positions fwd"]] + theme(legend.position="none") + ggtitle("fwd")+ xlab(""), 
-                               fig3[["4 mismatches positions rev"]] + theme(legend.position="none") + ggtitle("rev"),
+fig_subV4 <- cowplot::plot_grid(fig3[["8 mismatches positions fwd"]] + theme(legend.position="none") + ggtitle("fwd")+ xlab(""), 
+                               fig3[["8 mismatches positions rev"]] + theme(legend.position="none") + ggtitle("rev"),
                                nrow = 2,
                                align = "v" )
 
-fig_sub29 <- cowplot::plot_grid(fig3[["29 mismatches positions fwd"]] + theme(legend.position="none") + ggtitle("fwd")+ xlab(""), 
-                               fig3[["29 mismatches positions rev"]] + theme(legend.position="none") + ggtitle("rev"),
+fig_subV9 <- cowplot::plot_grid(fig3[["27 mismatches positions fwd"]] + theme(legend.position="none") + ggtitle("fwd")+ xlab(""), 
+                               fig3[["27 mismatches positions rev"]] + theme(legend.position="none") + ggtitle("rev"),
                                nrow = 2,
                                align = "v" )
 
 
-fig <- cowplot::plot_grid(legend_mismatches, 
+fig <- cowplot::plot_grid(  legend_mismatches, 
                             legend_size_distri, 
-                            fig3[["4 mismatches"]] + theme(legend.position="none"),
-                            fig_sub4, 
-                            fig3[["4 size_distri"]] + theme(legend.position="none"), 
-                            fig3[["4 size"]],
-                            fig3[["29 mismatches"]]+ theme(legend.position="none"),
-                            fig_sub29, 
-                            fig3[["29 size_distri"]]+ theme(legend.position="none"), 
-                            fig3[["29 size"]], 
-                   labels = c("","","A - Primer V4 #4","","","", "B - Primer V9 #29","","",""), 
+                            fig3[["8 mismatches"]] + theme(legend.position="none"),
+                            fig_subV4, 
+                            fig3[["8 size_distri"]] + theme(legend.position="none"), 
+                            fig3[["8 size"]],
+                            fig3[["27 mismatches"]]+ theme(legend.position="none"),
+                            fig_subV9, 
+                            fig3[["27 size_distri"]]+ theme(legend.position="none"), 
+                            fig3[["27 size"]], 
+                   labels = c("","","A - Primer V4 #08","","","", "B - Primer V9 #27","","",""), 
                    label_y = 1.05, hjust = -0.1, scale=0.95,
                    ncol = 2, nrow = 5, rel_heights = c(4,20,20,20,20),
                    align = "h" )
@@ -1389,7 +1447,7 @@ fig <- cowplot::plot_grid(legend_mismatches,
 fig
 
 ggsave(plot= fig , filename="../figs/fig_examples_V4_V9.pdf",
-           width = 20 , height = 25, scale=1.8, units="cm", useDingbats=FALSE)
+           width = 20 , height = 25, scale=2.5, units="cm", useDingbats=FALSE)
 
 
 
@@ -1410,12 +1468,18 @@ fig_3 <- cowplot::plot_grid(fig_supergroup[[str_c("mismatches", specific_one, se
                             fig_supergroup[[str_c("size", specific_one, sep = " ")]], NULL,
                    labels = c("A","", "B",""), ncol = 2, nrow = 2, align = "v" , rel_widths= c(13,0.2))
 
-fig_3
+print(fig_3)
 
 height <- row_height*(ceiling(n_primers[[specific_one]]/ncol))
 
 ggsave(plot= fig_3 , filename=str_c("../figs/fig_supergroup_", specific_one, ".pdf"),
-           width = 14 , height = height, scale=1.75, units="cm", useDingbats=FALSE)
+           width = 20 , height = height, scale=1.75, units="cm", useDingbats=FALSE)
+
+# ggsave(plot= fig_supergroup[[str_c("mismatches", specific_one, sep = " ")]] , filename=str_c("../figs/fig_supergroup_", specific_one, "_A.pdf"),
+#            width = 14 , height = height/2, scale=1.75, units="cm", useDingbats=FALSE)
+# 
+# ggsave(plot=  fig_supergroup[[str_c("size", specific_one, sep = " ")]] , filename=str_c("../figs/fig_supergroup_", specific_one, "_B.pdf"),
+#            width = 14 , height = height/2, scale=1.75, units="cm", useDingbats=FALSE)
 
 }
 
@@ -1432,14 +1496,58 @@ for (specific_one in c("general", "specific")) {
 fig_4 <- cowplot::plot_grid(fig_class[[str_c("pct", specific_one, sep = " ")]], 
                    ncol = 1, nrow = 1, align = "v" )
 
-fig_4
+print(fig_4)
 
 height <- row_height*(trunc(n_primers[[specific_one]]/ncol))
 
 ggsave(plot= fig_4 , filename=str_c("../figs/fig_class_", specific_one, ".pdf"),
-           width = 7 , height = height, scale=3, units="cm", useDingbats=FALSE)
+           width = 10 , height = height, scale=3, units="cm", useDingbats=FALSE)
 
 
 }
 ```
+## Fig - Primer sets position
 
+```{r fig.height=12, fig.width=8}
+
+reorder_primer<- function (x, y) {x+0.01*(y-x)}
+
+fig <- ggplot(filter(primer_sets, !is.na(fwd_start_yeast))) +
+  geom_segment(aes(
+    x = fwd_start_yeast, 
+    xend = rev_end_yeast,
+    y = forcats::fct_reorder2(primer_set_name, fwd_start_yeast,rev_end_yeast, reorder_primer), 
+    yend = forcats::fct_reorder2(primer_set_name, fwd_start_yeast,rev_end_yeast, reorder_primer),
+    color = specific
+  ),
+  size = 3
+  ) +
+  geom_text(aes(x = rev_end_yeast + 50, 
+                y = forcats::fct_reorder2(primer_set_name, fwd_start_yeast,rev_end_yeast, reorder_primer), 
+                label = str_c(primer_set_id, gene_region, str_replace_all(primer_set_name, c("_" = " ", "V4"="", "V9"="")), str_replace_na(specificity, ""), sep = " ")),
+    size = 3, hjust = 0
+  ) +
+  scale_color_manual(name = "",  values = c("general" = "gray30", "specific" = "grey70")) +
+  guides(fill = guide_legend(nrow = 1)) +
+  theme(legend.position = "top", 
+        legend.box = "horizontal",
+        panel.grid.major.y = element_blank(),
+        axis.text.y = element_blank() ,
+        axis.line.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.border= element_blank() ) +
+  
+  labs(
+    x = "Position on 18S rRNA",
+    y = "",
+    legend = ""
+  ) +
+  xlim(0,2100) +
+  coord_cartesian(clip = "off") 
+
+fig
+
+ggsave(plot= fig , filename=str_c("../figs/fig_primer_sets_position.pdf"),
+           width = 10 , height = 15, scale=2, units="cm", useDingbats=FALSE)
+  
+```

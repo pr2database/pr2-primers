@@ -58,6 +58,8 @@ ui <- fluidPage(
           radioButtons("type", "Primer type:",
                c("General" = "general",
                  "Specific" = "specific")),
+          selectInput("kingdom_3", "Kingdom",
+               choices = c("Eukaryota", "Bacteria", "Archaea")),
       ),
       
       # --- Amplification for one primer set and one taxonomic level
@@ -93,8 +95,10 @@ ui <- fluidPage(
       conditionalPanel(
         'input.panel == "Amplification - details" || input.panel == "Test your primer set"', 
           hr(),
+          selectInput("kingdom", "Kingdom",
+               choices = c("Eukaryota", "Bacteria", "Archaea")),
           selectInput("supergroup", "Supergroup",
-               choices = c("All", unique(pr2_taxo$supergroup))),
+               choices = NULL),
           selectInput("division", "Division",
                choices = NULL),
           selectInput("class", "Class",

@@ -35,7 +35,7 @@ library(Biostrings)
 max_mismatch = 2
 gene_selected = "18S_rRNA"  # Can be 18S_rRNA or 16_rRNA
 
-sequence_length_min = 1500
+sequence_length_min = 1350
 sequence_length_min_V9 = 1650 
 sequence_length_min_V4 = 1200 
 
@@ -46,7 +46,9 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
 # --- Primers
 
   primers<- import("data/primers.rds") %>% 
-    filter(str_detect(gene, "rRNA")) 
+    filter(str_detect(gene, "rRNA")) %>% 
+    mutate(doi = doi_html)%>% 
+    select(- doi_html)
     
   primer_sets<- import("data/primer_sets.rds") %>% 
     filter(str_detect(gene, "rRNA"))  %>% 
@@ -55,12 +57,14 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
                                          primer_set_name, "-", 
                                          str_replace_na(specificity, "general"), 
                                          sep = " ")) %>% 
+    mutate(doi = doi_html) %>% 
+    select(- doi_html) %>% 
     arrange(primer_set_id)
 
 
 # --- At euk level
 
-  pr2_match_euk <- import("data/pr2_match_18S_rRNA_mismatches_2_summary.rds") %>% 
+  pr2_match_summary <- import("data/pr2_match_18S_rRNA_mismatches_2_summary.rds") %>% 
     select(-primer_set_label_long) %>% 
     left_join(select(primer_sets, primer_set_id, primer_set_label_long)) 
   
@@ -69,7 +73,7 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
 
 # ------ This is for the first graph with matches fwd and reverse
 
-  pr2_match_euk_long_1 <- pr2_match_euk %>% 
+  pr2_match_summary_long_1 <- pr2_match_summary %>% 
       tidyr::pivot_longer(names_to="pct_category", 
                           values_to = "pct_seq", 
                           cols = fwd_pct:ampli_pct) %>% 
@@ -77,7 +81,7 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
 
 # ------ This is for the second graph with number of mismatches
 
-  pr2_match_euk_long_2 <- pr2_match_euk %>% 
+  pr2_match_summary_long_2 <- pr2_match_summary %>% 
     tidyr::pivot_longer(names_to="mismatch_number", 
                         values_to = "mismatch_pct", 
                         cols = contains("ampli_mismatch"),
@@ -89,16 +93,19 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
   # ------ List of primer tested
   
   primer_sets_tested <- primer_sets %>% 
-    filter(primer_set_id %in% pr2_match_euk$primer_set_id)
+    filter(primer_set_id %in% pr2_match_summary$primer_set_id)
 
 # --- Read pr2
   pr2 <- import("data/pr2_4.12.0.rds")
+  silva <- import("data/silva_seed_132.rds")
+  
+  pr2 <- bind_rows(pr2, silva)
 
 # --- Taxonomic levels
 
   # load("data/pr2_match_18S_rRNA_set_008_mismatches_2.rda")
 
   pr2_taxo <- pr2 %>% 
-      select(supergroup, division, class, order, family, genus) %>% 
-      arrange(supergroup, division, class, order, family, genus) %>% 
+      select(kingdom, supergroup, division, class, order, family, genus) %>% 
+      arrange(kingdom, supergroup, division, class, order, family, genus) %>% 
       distinct()

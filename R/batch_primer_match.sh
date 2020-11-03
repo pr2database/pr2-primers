@@ -69,7 +69,6 @@ qsub qsub_primer_match.sh 101
 qsub qsub_primer_match.sh 102
 qsub qsub_primer_match.sh 103
 qsub qsub_primer_match.sh 104
-qsub qsub_primer_match.sh 105
 qsub qsub_primer_match.sh 106
 qsub qsub_primer_match.sh 107
 qsub qsub_primer_match.sh 108

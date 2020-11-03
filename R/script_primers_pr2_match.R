@@ -1,6 +1,28 @@
 # ---
+# Aim: Compute matches for one set of primer
+# Author: D. Vaulot
 # This script is much slower but find # of mismatches and location of mismatches closer to 3' end
 # ---
+
+## Programing Notes
+
+#     * Use Biostrings
+# 
+# Accessor methods : In the code snippets below, x is an MIndex object.  
+# 
+#     * length(x): The number of patterns that matches are stored for.
+#     * names(x): The names of the patterns that matches are stored for.
+#     * startIndex(x): A list containing the starting positions of the matches for each pattern.
+#     * endIndex(x): A list containing the ending positions of the matches for each pattern.
+#     * elementNROWS(x): An integer vector containing the number of matches for each pattern.
+#     * x[[i]]: Extract the matches for the i-th pattern as an IRanges object.
+#     * unlist(x, recursive=TRUE, use.names=TRUE): Return all the matches in a single IRanges object. recursive and use.names are ignored.
+#     * extractAllMatches(subject, mindex): Return all the matches in a single XStringViews object.
+# 
+# One could also use another function which does not give the position
+#     * match_fwd <- vcountPattern(fwd, seq,max.mismatch=0, min.mismatch=0, with.indels=FALSE, fixed=FALSE, algorithm="auto")
+
+# ===========================================================================
 
 # Initialize
 
@@ -103,17 +125,18 @@ match_primer <- function(primer, seq, max_mismatch, direction = "forward") {
   
 # Read the primer file -----------------------
 
-  file_name = str_c("output/Table_primers_",gene_selected, ".xlsx")
-  primer_sets <- read_xlsx(file_name)
+  primer_sets <- readRDS("input/primer_sets.rds")
   primer_sets <- primer_sets %>% 
   filter(primer_set_id == set_id)
   
 
-# Read pr2 -----------------------------------
+# Read pr2 and silva seed -----------------------------------
 
   # From R object <- Use for Geisen paper
-  file_name = str_c("output/pr2_4.12.rda")
+  file_name = str_c("input/pr2_4.12.rda")
   load(file_name)
+  
+  silva_pr2 <- readRDS("input/silva_seed_132.rds")
 
   # From database for other analysis
   # pr2_active  <- pr2_read()
@@ -127,6 +150,8 @@ pr2_active  <- pr2 %>%
   # filter (is.na(removed_version)) %>% 
   filter (!str_detect(sequence,"[^ATGCU]")) %>% 
   filter(gene == gene_selected ) 
+
+pr2_active <- bind_rows(pr2_active, silva_pr2) 
 
 # For tests
   if (opt$test) pr2_active <- pr2_active[1:100,]

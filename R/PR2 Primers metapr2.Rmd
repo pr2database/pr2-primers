@@ -135,7 +135,9 @@ primer_sets <- primer_sets %>%
 
 ```{r}
   datasets <- metapr2_export_datasets() %>% 
-     filter(gene == "18S rRNA") 
+     filter(gene == "18S rRNA",
+            !is.na(paper_doi)
+     )
 ```
 
 ## Make the primer table
@@ -165,7 +167,7 @@ primer_sets <- primer_sets %>%
 
 ```
 
-## Make the primer table
+## Make the primer set table
 
 ```{r}
  primer_sets_metapr2 <- datasets %>% 

@@ -2,13 +2,16 @@
 # Function to plot matches for all primers --------------------------------
 
 
-plot_matches <- function(type = "general") {  
+plot_matches <- function( kingdom_one = "Eukaryota", type = "general") {  
 
   # --- Plot number of sequence amplified with fwd, rev and both
   
-  df <- pr2_match_euk_long_1 %>% 
+  df <- pr2_match_summary_long_1 %>% 
       filter(pct_category %in% c("ampli_pct", "fwd_pct", "rev_pct")) %>% 
-      filter(specific == type)
+      filter(specific == type) %>% 
+      filter(kingdom == kingdom_one)
+  
+  # print(kingdom_one)
 
   g1 <- ggplot(df) + 
     geom_col(aes(x=primer_set_label_long, y=pct_seq, 
@@ -29,8 +32,9 @@ plot_matches <- function(type = "general") {
   
   # --- Plot number of mismatches
 
-  df <- pr2_match_euk_long_2 %>%  
-      filter(specific == type)  
+  df <- pr2_match_summary_long_2 %>%  
+      filter(specific == type) %>% 
+      filter(kingdom == kingdom_one) 
   
   g2 <- ggplot(df,
             aes(x = primer_set_label_long,
@@ -55,9 +59,10 @@ plot_matches <- function(type = "general") {
 
   # --- Plot amplicon size
     
-  df <- pr2_match_euk %>% 
+  df <- pr2_match_summary %>% 
       filter(!is.nan(ampli_size_mean)) %>%  
-      filter(specific == type)
+      filter(specific == type) %>% 
+      filter(kingdom == kingdom_one)
   
   g3 <- ggplot(df) + 
     geom_point(aes(x=primer_set_label_long, y=ampli_size_mean), colour="black") +
@@ -88,6 +93,9 @@ plot_matches <- function(type = "general") {
 
   plot_matches_detailed_taxa <- function(one_primer_set = 4, taxo_level_quoted = "supergroup", taxo_name = "Chlorophyta"){
     
+    print(cat("Taxo level : ", taxo_level_quoted))
+    print(cat("Taxo name : ", taxo_name))
+    
     one_primer_set_data = filter(primer_sets, primer_set_id == one_primer_set)
     fwd_name = one_primer_set_data$fwd_name
     rev_name = one_primer_set_data$rev_name        
@@ -108,8 +116,24 @@ plot_matches <- function(type = "general") {
         filter(! str_detect(pr2_accession, "_UC")) %>%  # Remove sequences for which the introns have been removed
         filter(sequence_length >= sequence_length_min)  # Remove sequences that are too short
         
-    rm(pr2_match) # To save memory    
+    rm(pr2_match) # To save memory 
+    
+  #  --- Compute summary at kingdom level
+    
+    summary_kingdom <- df  %>%      
+      group_by(kingdom) %>% 
+      summarise(pct_fwd = sum(!is.na(fwd_pos))/n()*100,
+                pct_rev = sum(!is.na(rev_pos))/n()*100,
+                pct_amplified = sum(!is.na(ampli_size))/n()*100,
+                mean_amplicon_size = mean(ampli_size, na.rm = TRUE)) %>%
+      tidyr::pivot_longer(cols = pct_fwd:mean_amplicon_size, names_to = "Parameter", values_to = "Values") %>%
+      mutate(Parameter = str_replace_all(Parameter,c("_" = " ",
+                                                     "pct" = "% sequences",
+                                                     "fwd" = "matching forward primer",
+                                                     "rev" = "matching reverse primer")))
       
+    
+  #  --- Filter by taxo level
     
     taxo_level=as.symbol(taxo_level_quoted)
     taxo_level_below_quoted = taxo_levels[which(taxo_levels == taxo_level_quoted) + 1]
@@ -133,6 +157,8 @@ plot_matches <- function(type = "general") {
 
   # --- Computer number of taxa  to adjust the height of the graph
     n_taxa = length(unique(pull(df2, !!taxo_level_below)))
+    n_taxa = max(4, n_taxa)  # If one taxa, too small
+
   
   # --- Plot size of amplicons
   
@@ -145,6 +171,7 @@ plot_matches <- function(type = "general") {
         # theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
         xlab("") + ylab("Amplicon size (bp)") 
     print("after g2")
+
     
   # --- Plot location of mismatches fwd primer 
   
@@ -200,10 +227,9 @@ plot_matches <- function(type = "general") {
       coord_flip()  
     print("after g1")
     
-    
     gg <- (g3+g4) /(g1+g2) + plot_layout(heights = c(1, 0.3 + n_taxa/15))
     
-    return(list(gg = gg, n_taxa = n_taxa))
+    return(list(summary_kingdom = summary_kingdom, gg = gg, n_taxa = n_taxa))
   }
   
   
@@ -237,6 +263,7 @@ plot_matches <- function(type = "general") {
 
   # --- Computer number of taxa  to adjust the height of the graph
     n_taxa = length(unique(pull(df2, !!taxo_level_below)))
+    n_taxa = max(4, n_taxa) # If only 1 taxa, too small...
     
     # print(n_taxa)
   
