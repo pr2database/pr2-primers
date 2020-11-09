@@ -46,8 +46,7 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
 # --- Primers
 
   primers<- import("data/primers.rds") %>% 
-    filter(str_detect(gene, "rRNA")) %>% 
-    rename (doi_id = doi, doi = doi_html)
+    filter(str_detect(gene, "rRNA")) 
     
   primer_sets<- import("data/primer_sets.rds") %>% 
     filter(str_detect(gene, "rRNA"))  %>% 
@@ -55,8 +54,7 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
                                          gene_region, 
                                          primer_set_name, "-", 
                                          str_replace_na(specificity, "general"), 
-                                         sep = " ")) %>%  
-    rename (doi_id = doi, doi = doi_html) %>% 
+                                         sep = " "))  %>% 
     arrange(primer_set_id)
 
 
