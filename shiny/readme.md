@@ -33,6 +33,6 @@ Geisen S., Vaulot D., Mahé F., Lara E., de Vargas C., Bass D. 2019. A user guid
 
 ### Contributors
 
-* Stefan Geisen: S.Geisen@nioo.knaw.nl
+* Stefan Geisen:  stefan.geisen@wur.nl
 * Fréderic Mahé: frederic.mahe@cirad.fr
 * Enrique Lara: enrique.lara@rjb.csic.es

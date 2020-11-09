@@ -354,7 +354,7 @@ full_file_name <- function(file_name) {str_c(table_path, file_name)}
 
 
 latex_table(table = table_primers,
-            caption = "Number of primers listed in the pr2-primer database",
+            caption = "Type of primers listed in the pr2-primer database. General primers target all eukaryotes and specific only certain taxonomic groups.",
             label = "tab:primers",
             file = full_file_name("table_primers.tex"),
             align = c("l","c","c", "c"),
@@ -368,7 +368,7 @@ latex_table(table = table_primers,
 ```{r, eval=FALSE}
 
 latex_table(table = table_primer_sets,
-            caption = "Number of primer sets listed in the pr2-primer database",
+            caption = "Regions of the 18S rRNA gene targeted by the primer sets from the pr2-primer database.",
             label = "tab:primer_sets",
             file = full_file_name("table_primer_sets.tex"),
             align = c("l","l","c", "c"),
@@ -384,7 +384,7 @@ latex_table(table = table_primer_sets,
 
 
 latex_table(table = table_primer_sets_ampli,
-            caption = "Overall characteristics of primer sets listed in the PR2 primer database",
+            caption = "Overall characteristics of primer sets listed in the PR2 primer database.",
             label = "tab:primer_sets_ampli",
             file = full_file_name("table_primer_sets_ampli.tex"),
             align = c("l","l","c", "c"),
@@ -417,7 +417,7 @@ add.to.row$command <- c(
 
 
 latex_table(table = table,
-            caption = "List of primers in the pr2-primer database. The start position is relative to the sequence of the yeast Saccharomyces cerevisiae (FU970071).",
+            caption = "List of primers in the pr2-primer database ordered by start position relative to the sequence of the yeast \textit{Saccharomyces cerevisiae} (FU970071).",
             label = "tabsup:primers",
             file = full_file_name("table_sup_primers.tex"),
             align = c("l","l","l", "l","l","l","l", "l" ),
@@ -453,7 +453,7 @@ add.to.row$command <- c(
 
 
 latex_table(table = table,
-            caption = "List of primer sets in the pr2-primer database",
+            caption = "List of primer sets in the pr2-primer database.",
             label = "tabsup:primer_sets",
             file = full_file_name("table_sup_primer_sets.tex"),
             align = c("l","l","l", "l","l","l","l", "l" ),
