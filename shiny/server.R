@@ -54,7 +54,7 @@ server <- function(input, output, session) {
           p("Overall statistics"),
           p(),
           renderTable(data_4()$summary_kingdom, width = 600, colnames = FALSE),
-          p(strong("Top panel:"), "Location of mismatches for fwd and reverse primer.", 
+          p(strong("Top panel:"), "Location of mismatches for forward and reverse primer.", 
             strong("Bottom panel left"), "number of mismatches.",
             strong("Bottom panel right:"), "amplicon size"),
           renderPlot({
