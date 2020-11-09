@@ -10,7 +10,7 @@ server <- function(input, output, session) {
   
   output$table_primers_download <- downloadHandler(
           filename = function() {str_c("primers_", Sys.Date(), ".tsv")},
-          content = function(path) {export(primers, file=path)}
+          content = function(path) {export(select(primers, -doi), file=path)}
   )      
 
 
@@ -22,7 +22,7 @@ server <- function(input, output, session) {
   
   output$table_primer_sets_download <- downloadHandler(
           filename = function() {str_c("primer_sets_", Sys.Date(), ".tsv")},
-          content = function(path) {export(primer_sets, file=path)}
+          content = function(path) {export(select(primer_sets, -doi), file=path)}
   )      
 
 
