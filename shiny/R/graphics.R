@@ -301,3 +301,5 @@ plot_matches <- function( kingdom_one = "Eukaryota", type = "general") {
     
     return(list(gg = gg, n_taxa = n_taxa))
   }  
+
+    print("graphics.R done")

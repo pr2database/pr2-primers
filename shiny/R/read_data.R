@@ -105,3 +105,5 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
       select(kingdom, supergroup, division, class, order, family, genus) %>% 
       arrange(kingdom, supergroup, division, class, order, family, genus) %>% 
       distinct()
+
+  print("read_data.R done")

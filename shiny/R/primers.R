@@ -130,4 +130,6 @@ primer_match <- function(fwd_seq="GCCAGCAVCYGCGGTAAY", rev_seq ="CCGTCAATTHCTTYA
                                      TRUE ~ ampli_size))
   
    return(pr2_match)
- }
+}
+
+  print("primers.R done")

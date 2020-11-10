@@ -23,3 +23,5 @@ taxo_selected <- function(kingdom, supergroup, division, class){
       
 return( list(level = taxo_level, name = taxo_name))      
 }
+
+  print("taxonomy.R done")

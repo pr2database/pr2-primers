@@ -52,7 +52,8 @@ primers <- primers %>%
   relocate(length, .after = `sequence revcomp`) %>%  
   arrange(gene, start_yeast) %>% 
   mutate(doi_html = case_when(!is.na(doi) ~ str_c('<a href="https://doi.org/', doi,'">', doi, '</a>'),
-                         TRUE ~ doi)) 
+                         TRUE ~ doi)) %>%  
+  relocate(doi_html, .after = doi)
     
 
 # Construct primer set table ----------------------------------------------
@@ -75,12 +76,13 @@ primers <- primers %>%
             by = c("rev_id" = "primer_id")) %>% 
     mutate(amplicon_size = rev_end_yeast - fwd_start_yeast + 1) %>% 
     mutate(doi_html = case_when(!is.na(doi) ~ str_c('<a href="https://doi.org/', doi,'">', doi, '</a>'),
-                           TRUE ~ doi)) %>%  
+                           TRUE ~ doi))  %>% 
     rename_all(funs(str_replace(., "_yeast", ""))) %>% 
     select(-remark_internal, -used_in) %>%
     relocate(fwd_id, .before = fwd_name) %>% 
     relocate(rev_id, .before = rev_name) %>%
-    relocate(reference, doi, remark, .after = last_col()) %>% 
+    relocate(reference, doi, remark, .after = last_col()) %>%  
+    relocate(doi_html, .after = doi) %>% 
     arrange(gene_region,  fwd_start, rev_start) 
 
 # Save the primer files -------------------------------------------------------

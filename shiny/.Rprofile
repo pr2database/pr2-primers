@@ -1,1 +1,3 @@
-source("renv/activate.R")
+# source("renv/activate.R")
+
+options(repos = BiocManager::repositories())
