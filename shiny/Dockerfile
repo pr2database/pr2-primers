@@ -13,11 +13,6 @@ COPY /www  ./www
 COPY /data  ./data
 COPY /R  ./R
 
-# install renv & restore packages
-
-# COPY renv.lock ./
-# COPY /renv  ./renv
-# RUN Rscript R/renv.R
 
 # install directly the packages
 
@@ -36,5 +31,8 @@ USER shiny
 # avoid s6 initialization
 # see https://github.com/rocker-org/shiny/issues/79
 
+# The next line prevents the application to start on Google
 # CMD ["R", "-e", "shiny::runApp(port = 8080)"]
+
+# Better to use
 CMD ["/usr/bin/shiny-server"]
