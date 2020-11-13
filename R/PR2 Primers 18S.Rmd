@@ -5,19 +5,19 @@ date: '`r format(Sys.time(), "%d %m %Y")`'
 header-includes:
    - \usepackage{color, fancyvrb}
 output:
+  rmdformats::readthedown:
+    highlight: kate
+    number_sections : yes    
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+    number_sections : yes
   prettydoc::html_pretty:
     theme: cayman
     highlight: github
     toc: yes
     toc_depth: 3
     number_sections : yes
-  pdf_document: 
-    toc: yes
-    toc_depth: 3
-    number_sections : yes
-  rmdformats::readthedown:
-    highlight: kate
-    number_sections : yes    
 ---
 
 # Goal
@@ -75,6 +75,8 @@ Load the variables common to the different scripts and the necessary libraries
                         fig.height=6, 
                         eval=TRUE, 
                         cache=TRUE,
+# For next line see https://stackoverflow.com/questions/39417003/long-vectors-not-supported-yet-error-in-rmd-but-not-in-r-script                       
+                        cache.lazy = FALSE,
                         echo=TRUE,
                         prompt=FALSE,
                         tidy=TRUE,
@@ -126,7 +128,6 @@ Only keep the 18S primers with V region
     filter(gene == "18S rRNA",
            !is.na(doi) ,
            !str_detect(gene_region,"ITS|cloning|full")
-            # str_detect(gene_region,"^V") # Start with V
           )
     
   
@@ -486,7 +487,7 @@ fig3 <- list()
 
 ```{r amplicon_length, fig.height=10, fig.width=15}
 
- ggplot(filter(pr2_match_final, kingdom = "Eukaryota"),
+ ggplot(filter(pr2_match_final, kingdom == "Eukaryota"),
         aes(x = primer_set_label_short,
             y = ampli_size,
             group = primer_set_id,
@@ -506,7 +507,7 @@ fig3 <- list()
 ```{r amplicon_length_average, fig.height=10, fig.width=15}
 
 ggplot(
-  filter(pr2_match_final, kingdom = "Eukaryota"),
+  filter(pr2_match_final, kingdom == "Eukaryota"),
   aes(
     x = primer_set_label_short,
     y = ampli_size,
@@ -1295,7 +1296,7 @@ library(patchwork)
 
 ### Eukaryota
 
-```{r,  fig.height=12, fig.width=12, eval=TRUE}
+```{r,  fig.height=12, fig.width=12, eval=FALSE}
 
 
 fig_1 <-( fig1[["Eukaryota V4 pct"]]  +ggtitle("")+ ylab("") +
@@ -1322,7 +1323,7 @@ ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_V4_V9_euk.pdf",
 
 ### Bacteria
 
-```{r,  fig.height=12, fig.width=12, eval=TRUE}
+```{r,  fig.height=12, fig.width=12, eval=FALSE}
 
 
 fig_1_bact <-( fig1[["Bacteria V4 pct"]]  +ggtitle("")+ ylab("") +
@@ -1343,7 +1344,7 @@ ggsave(plot= fig_1_bact , filename="../figs/fig_pct_sizes_mismatches_V4_bact.pdf
 
 ### Archaea
 
-```{r,  fig.height=12, fig.width=12, eval=TRUE}
+```{r,  fig.height=12, fig.width=12, eval=FALSE}
 
 
 fig_1_arch <-( fig1[["Archaea V4 pct"]]  +ggtitle("")+ ylab("") +
@@ -1365,7 +1366,7 @@ ggsave(plot= fig_1_arch , filename="../figs/fig_pct_sizes_mismatches_V4_arch.pdf
 
 ## Fig. 1 - All - Amplification % and size and mismatches
 
-```{r,  fig.height=12, fig.width=12, eval=TRUE}
+```{r,  fig.height=12, fig.width=12, eval=FALSE}
 
 
 legend_pct <- cowplot::get_legend( fig1[["Eukaryota general pct"]] + 
@@ -1405,7 +1406,7 @@ ggsave(plot= fig_1 , filename="../figs/fig_pct_sizes_mismatches_all.pdf",
 
 ## Fig. - Example of V4 and V9
 
-```{r,  fig.height=9, fig.width=18, eval=TRUE}
+```{r,  fig.height=9, fig.width=18, eval=FALSE}
 
 legend_mismatches <- cowplot::get_legend( fig3[["8 mismatches"]] + 
                       # create some space to the left of the legend    
@@ -1457,7 +1458,7 @@ ggsave(plot= fig , filename="../figs/fig_examples_V4_V9.pdf",
 
 ## Fig. 3 - Supergroup analysis
 
-```{r,  fig.height=9, fig.width=9, eval=TRUE}
+```{r,  fig.height=9, fig.width=9, eval=FALSE}
 
 row_height = 5
 
@@ -1487,7 +1488,7 @@ ggsave(plot= fig_3 , filename=str_c("../figs/fig_supergroup_", specific_one, ".p
 
 ## Fig. 4 - Class analysis
 
-```{r,  fig.height=9, fig.width=9, eval=TRUE}
+```{r,  fig.height=9, fig.width=9, eval=FALSE}
 
 row_height = 3.5
 
@@ -1508,7 +1509,7 @@ ggsave(plot= fig_4 , filename=str_c("../figs/fig_class_", specific_one, ".pdf"),
 ```
 ## Fig - Primer sets position
 
-```{r fig.height=12, fig.width=8}
+```{r fig.height=12, fig.width=8, eval=FALSE}
 
 reorder_primer<- function (x, y) {x+0.01*(y-x)}
 
