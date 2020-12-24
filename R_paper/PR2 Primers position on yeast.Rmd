@@ -1,0 +1,113 @@
+---
+title: "Testing primers against yeast sequence"
+author: "Daniel Vaulot"
+date: '`r format(Sys.time(), "%d %m %Y")`'
+header-includes:
+   - \usepackage{color, fancyvrb}
+output:
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+    toc: yes
+    toc_depth: 3
+    number_sections : yes
+  pdf_document: 
+    toc: yes
+    toc_depth: 3
+    number_sections : yes
+  rmdformats::readthedown:
+    highlight: kate
+    number_sections : yes    
+---
+
+
+# Goal
+* Display primer set matches against the PR2 database (latest version 4.12.0)
+
+* Matches are computed by an independent R script (PR2 Primers pr2_match.R) and stored in an rda file which is read by this Rmd file.
+
+* In this version # of mismatches is computed as well as position of mismatches
+
+* http://kasperdanielhansen.github.io/genbioconductor/
+
+# Initialize
+Load the variables common to the different scripts and the necessary libraries
+
+```{r init, eval=TRUE, message=FALSE, warning=FALSE}
+
+# Libraries for bioinfo ----------------------------------------------------
+
+  library("Biostrings")
+
+# Libraries tidyr ---------------------------------------------------------
+
+  library("dplyr")   
+  library(openxlsx)
+  library("tibble")
+  library("readr")
+  library("purrr")
+  library("stringr")
+
+# Libraries dvutils and pr2database -------------------------------------------------------
+  if(any(grepl("package:dvutils", search()))) detach("package:dvutils", unload=TRUE)
+  library("dvutils")
+
+  if(any(grepl("package:pr2database", search()))) detach("package:pr2database", unload=TRUE)
+  library("pr2database")
+
+# Options for knitting the report -------------  
+  
+  library(knitr)
+  library(rmdformats)
+  library(kableExtra) 
+
+  knitr::opts_chunk$set(fig.width=8, 
+                        fig.height=6, 
+                        eval=TRUE, 
+                        cache=TRUE,
+                        echo=TRUE,
+                        prompt=FALSE,
+                        tidy=TRUE,
+                        comment=NA,
+                        message=FALSE,
+                        warning=FALSE)
+  opts_knit$set(width=90)
+  options(max.print="500")  
+  options(knitr.kable.NA = '')
+```
+
+
+## Compute position on yeast
+
+```{r, eval=FALSE}
+
+# Read from local database
+pr2_db <- db_info("pr2_google")
+pr2_db_con <- db_connect(pr2_db)
+primers <- tbl(pr2_db_con, "pr2_primers") %>% 
+  collect() %>% 
+  filter(is.na(start_yeast), 
+         gene == "18S rRNA")
+disconnect <- db_disconnect(pr2_db_con)
+
+
+ref_seq <- pr2 %>% 
+  filter(pr2_accession == "FU970071.1.1799_U") 
+
+# Matches the position of the primers on the yeast sequence
+#  - use map2_dfr to get an data frame on output and not a list
+#  - use ~ when defining the function
+
+primers_pos <- map2_dfr(primers$sequence,
+                        primers$direction, 
+                     ~ get_primer_position(.x, ref_seq$sequence, orientation =.y, mismatches = 3))
+
+primers <- bind_cols(primers, primers_pos) %>% 
+  filter(!is.na(start)) 
+
+primers <- primers %>% 
+  mutate(start_yeast = start,
+         end_yeast = end) 
+
+rio::export(primers, file = str_c("../output/primers_matches_yeast_", lubridate::today(), ".xlsx"), firstActiveRow = 2)
+```
