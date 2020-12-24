@@ -473,6 +473,8 @@ ncol = 8
   
 fig3 <- list()
 
+fig1 <- list()
+
 ```
 
 
@@ -766,13 +768,12 @@ Comments
     * Five more V4 primer sets are suitable for Illumina 3x250 (max amplicon size = 550 bp)
 
 
-### Plot only V4 and V9 - For Fig. 1
+### Plot only V4 and V9 - For Fig. 2
 
 ```{r , fig.height=10, fig.width=6}
 
 
 
-fig1 <- list()
 
 for (one_kingdom in kingdoms){
 
@@ -886,7 +887,7 @@ for (one_kingdom in kingdoms){
 }
 ```
 
-### Plot all with panel general and specific
+### Plot all with panel general and specific - For Fig S1
 
 ```{r , fig.height=10, fig.width=6}
 
@@ -947,7 +948,7 @@ for (one_kingdom in kingdoms){
 
 ```
 
-## Mismatches
+## Mismatches - for Fig.S1 
 
 ### Number of mismatches
 
@@ -1043,7 +1044,7 @@ for (one_kingdom in kingdoms){
   facet_wrap(vars(primer_set_label_long), ncol = ncol)
  
 ```
-## By supergroup (only for Eukaryota)
+## By supergroup (only for Eukaryota) - For Fig. S2 and S5
 
 Comments:
 
@@ -1115,7 +1116,7 @@ for (specific_one in c("general", "specific")) {
 }
 ```
 
-### Number of mismatches (Only Eukaryotes)
+### Number of mismatches (Only Eukaryotes) - Fig. S2 and S5
 
 ```{r fig.height=20, fig.width=20}
 
@@ -1164,7 +1165,7 @@ for (specific_one in c("general", "specific")) {
  
 ```
 
-## By class for autotrophs (Only EUkaryotes)
+## By class for autotrophs (Only EUkaryotes) - Fig. S6
 
 
 ```{r graph_class, fig.height=30, fig.width=20}
@@ -1506,15 +1507,15 @@ reorder_primer<- function (x, y) {x+0.01*(y-x)}
 
 fig <- ggplot(filter(primer_sets, !is.na(fwd_start))) +
   geom_segment(aes(
-    x = fwd_start_yeast, 
-    xend = rev_end_yeast,
+    x = fwd_start, 
+    xend = rev_end,
     y = forcats::fct_reorder2(primer_set_name, fwd_start,rev_end, reorder_primer), 
     yend = forcats::fct_reorder2(primer_set_name, fwd_start,rev_end, reorder_primer),
     color = specific
   ),
   size = 3
   ) +
-  geom_text(aes(x = rev_end_yeast + 50, 
+  geom_text(aes(x = rev_end + 50, 
                 y = forcats::fct_reorder2(primer_set_name, fwd_start,rev_end, reorder_primer), 
                 label = str_c(primer_set_id, gene_region, str_replace_all(primer_set_name, c("_" = " ", "V4"="", "V9"="")), str_replace_na(specificity, ""), sep = " ")),
     size = 3, hjust = 0
@@ -1534,7 +1535,7 @@ fig <- ggplot(filter(primer_sets, !is.na(fwd_start))) +
     y = "",
     legend = ""
   ) +
-  xlim(0,2100) +
+  xlim(0,2200) +
   coord_cartesian(clip = "off") 
 
 fig
