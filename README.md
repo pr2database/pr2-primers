@@ -27,8 +27,10 @@ Please report errors or primer sets not listed here in the [Issues page of the P
 
 Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer database for protists. Methods in Ecology and Evolution submitted. [deposited to BioRxiv](xxxx).
 
-### Availability
+### Resources
 * Docker: https://hub.docker.com/repository/docker/vaulot/pr2-primers
+* Source code: https://github.com/pr2database/pr2-primers
+* Script: https://pr2database.github.io/pr2-primers/PR2_Primers.html
 
 ### Maintainer
 * Daniel Vaulot: vaulot@gmail.com
@@ -40,6 +42,9 @@ Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer da
 * David Bass: david.bass@cefas.co.uk
 
 ### Versions
+
+1.0.2 - 2020-12-24
+* Add non-Metazoa primer and primer sets from Bass and del Campo 2020
 
 1.0.1 - 2020-12-14
 * Fix problem with V9 for bacteria

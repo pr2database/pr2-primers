@@ -19,7 +19,7 @@
 * Start Powershell under windows
 
 ```
-cd C:/daniel.vaulot@gmail.com/Databases/_PR2/pr2-primers/shiny
+cd C:/daniel.vaulot@gmail.com/Databases/_PR2/pr2-primers
 
 
 # Buid with cache
@@ -37,18 +37,8 @@ Test locally
 
 ## Push to Cloud run
 
-Push image to Google Registry (does not work)
-```
-gcloud auth login
 
-gcloud auth configure-docker
-
-docker tag pr2-primers asia.gcr.io/tactile-bolt-247111/pr2-primers:v1.0.1
-
-docker push asia.gcr.io/tactile-bolt-247111/pr2-primers
-```
-
-Alternatively, ultilize Google Builds to build image on the cloud
+Utilize Google Builds to build image on the cloud
 
 ```
 gcloud auth login
@@ -60,7 +50,7 @@ gcloud config set project tactile-bolt-247111
 gcloud builds submit --tag asia.gcr.io/tactile-bolt-247111/pr2-primers
 ```
 
-Deploy to Google Cloud Run
+Deploy to Google Cloud Run (Need only first time)
 
 ```
 gcloud run deploy --image asia.gcr.io/tactile-bolt-247111/pr2-primers --platform managed --max-instances 1
@@ -70,16 +60,28 @@ Effectuer ensuite un mappage de domaine sur:
 
 http://app.pr2-primers.org
 
+
+DO NOT USE - Push image to Google Registry 
+gcloud auth login
+
+gcloud auth configure-docker
+
+docker tag pr2-primers asia.gcr.io/tactile-bolt-247111/pr2-primers:v1.0.2
+
+docker push asia.gcr.io/tactile-bolt-247111/pr2-primers
+```
+
+
 ## Push container to Docker repository
 
 * Can also be done with Docker Desktop
 
 ```
-docker container ls
+docker images
 
-docker tag 05ea057 vaulot/pr2-primers:v1.0.1
+docker tag pr2-primers vaulot/pr2-primers:v1.0.2
 
-docker push vaulot/pr2-primers
+docker push vaulot/pr2-primers:v1.0.2
 ```
 
 ## Docker misc

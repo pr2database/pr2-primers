@@ -374,19 +374,19 @@ latex_table(table = table_primer_sets,
 
 ```
 
-### Table - Primer sets stats
+### Table - Primer sets stats - Modify for multi column before saving
 ```{r, eval=FALSE}
 
 
 
-latex_table(table = table_primer_sets_ampli,
-            caption = "Overall characteristics of primer sets listed in the pr2-primers database.",
-            label = "tab:primer_sets_ampli",
-            file = full_file_name("table_primer_sets_ampli.tex"),
-            align = c("l","l","c", "c"),
-            scalebox = 1,
-            digits= 1
-)
+# latex_table(table = table_primer_sets_ampli,
+#             caption = "Overall characteristics of primer sets listed in the pr2-primers database.",
+#             label = "tab:primer_sets_ampli",
+#             file = full_file_name("table_primer_sets_ampli.tex"),
+#             align = c("l","l","c", "c"),
+#             scalebox = 1,
+#             digits= 1
+# )
 
 ```
 
