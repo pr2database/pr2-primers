@@ -43,7 +43,7 @@ Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer da
 
 ### Versions
 
-1.0.2 - 2020-12-24
+1.0.2 - 2020-12-25
 * Add non-Metazoa primer and primer sets from Bass and del Campo 2020
 
 1.0.1 - 2020-12-14
