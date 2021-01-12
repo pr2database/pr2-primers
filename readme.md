@@ -1,5 +1,6 @@
 ## The PR2 primer database
 ---
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4433214.svg)](https://doi.org/10.5281/zenodo.4433214)
 
 A database of eukaryotic rRNA primers and primer sets for metabarcoding studies compiled from the literature. 
 
