@@ -2,7 +2,7 @@
 ---
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4433214.svg)](https://doi.org/10.5281/zenodo.4433214)
 
-A database of eukaryotic rRNA primers and primer sets for metabarcoding studies compiled from the literature. 
+An [interactive database](https://app.pr2-primers.org/) of eukaryotic rRNA primers and primer sets for metabarcoding studies compiled from the literature. 
 
 ### Database structure
 
@@ -29,6 +29,7 @@ Please report errors or primer sets not listed here in the [Issues page of the P
 Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer database for protists. Methods in Ecology and Evolution submitted. [deposited to BioRxiv](https://www.biorxiv.org/content/10.1101/2021.01.04.425170v1).
 
 ### Resources
+* Website: https://app.pr2-primers.org/
 * Docker: https://hub.docker.com/repository/docker/vaulot/pr2-primers
 * Source code: https://github.com/pr2database/pr2-primers
 * Script: https://pr2database.github.io/pr2-primers/PR2_Primers.html
