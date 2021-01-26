@@ -2,6 +2,12 @@
 # User interface ----------------------------------------------------------
 
 ui <- fluidPage(
+  
+  # Script to close the windows after some inactivity
+  
+  tags$script(inactivity), 
+  
+  # Title
   title = "Primer database",
   titlePanel(div(img(src='pr2_logo.png', width="80"),"The PR2 primer database")),
 

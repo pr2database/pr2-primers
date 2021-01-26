@@ -30,6 +30,30 @@ library(Biostrings)
 # library(DT)
 
 
+# Javascript function -----------------------------------------------------
+
+#  See: https://stackoverflow.com/questions/35306295/how-to-stop-running-shiny-app-by-closing-the-browser-window
+#   * Will close windows after x msec 60000 -> 1 min 1800000 -> 30 min
+
+inactivity <- "function idleTimer() {
+  var t = setTimeout(logout, 1800000);
+  window.onmousemove = resetTimer; // catches mouse movements
+  window.onmousedown = resetTimer; // catches mouse movements
+  window.onclick = resetTimer;     // catches mouse clicks
+  window.onscroll = resetTimer;    // catches scrolling
+  window.onkeypress = resetTimer;  //catches keyboard actions
+
+  function logout() {
+    window.close();  //close the window
+  }
+
+  function resetTimer() {
+    clearTimeout(t);
+    t = setTimeout(logout, 1800000);  // time is in milliseconds (1000 is 1 second)
+  }
+}
+idleTimer();"
+
 # Constants ---------------------------------------------------------------
 
 max_mismatch = 2
