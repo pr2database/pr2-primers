@@ -46,7 +46,7 @@ Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer da
 ### Versions
 
 1.0.4 - 2021-01-26
-* Add time out of 30 min and close browser window
+* Add time out of 10 min: after 10 min of inactivity close browser window and stop app.
 
 1.0.2 - 2020-12-25
 * Add non-Metazoa primer and primer sets from Bass and del Campo 2020

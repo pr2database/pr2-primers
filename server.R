@@ -1,6 +1,9 @@
 # Server ------------------------------------------------------------------
 
 server <- function(input, output, session) {
+  
+  # Stop the application of the session is closed (after 10 min)
+  session$onSessionEnded(stopApp)
 
   # 1 - Primer table
   output$table_primers <- renderDataTable({
