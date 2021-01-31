@@ -11,12 +11,7 @@ ui <- fluidPage(
   title = "Primer database",
   titlePanel(div(img(src='pr2_logo.png', width="80"),"The PR2 primer database")),
 
-  # fluidRow(
-  #   # --- Header
-  #   img(src='pr2_logo.png', align = "left"),
-  #   column(8, includeMarkdown("readme.md"))
-  #          ),
-  
+
   # --- Side bar
   sidebarLayout(
     
@@ -125,7 +120,7 @@ ui <- fluidPage(
       tabsetPanel(
         id = 'panel' ,
         
-        tabPanel("About", column(8, includeMarkdown("readme.md"))),
+        tabPanel("About", column(8, includeMarkdown("README.md"))),
 
         
         tabPanel("Primers", dataTableOutput("table_primers")),
