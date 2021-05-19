@@ -60,17 +60,30 @@
 # qsub qsub_primer_match.sh 91
 # qsub qsub_primer_match.sh 92
 
-qsub qsub_primer_match.sh 96
-qsub qsub_primer_match.sh 97
-qsub qsub_primer_match.sh 98
-qsub qsub_primer_match.sh 99
-qsub qsub_primer_match.sh 100
-qsub qsub_primer_match.sh 101
-qsub qsub_primer_match.sh 102
-qsub qsub_primer_match.sh 103
-qsub qsub_primer_match.sh 104
-qsub qsub_primer_match.sh 106
-qsub qsub_primer_match.sh 107
-qsub qsub_primer_match.sh 108
-qsub qsub_primer_match.sh 109
-qsub qsub_primer_match.sh 110
+# qsub qsub_primer_match.sh 96
+# qsub qsub_primer_match.sh 97
+# qsub qsub_primer_match.sh 98
+# qsub qsub_primer_match.sh 99
+# qsub qsub_primer_match.sh 100
+# qsub qsub_primer_match.sh 101
+# qsub qsub_primer_match.sh 102
+# qsub qsub_primer_match.sh 103
+# qsub qsub_primer_match.sh 104
+# qsub qsub_primer_match.sh 106
+# qsub qsub_primer_match.sh 107
+# qsub qsub_primer_match.sh 108
+# qsub qsub_primer_match.sh 109
+# qsub qsub_primer_match.sh 110
+
+sbatch sbatch_primer_match.sh 117
+sbatch sbatch_primer_match.sh 118
+sbatch sbatch_primer_match.sh 120
+sbatch sbatch_primer_match.sh 123
+sbatch sbatch_primer_match.sh 124
+sbatch sbatch_primer_match.sh 128
+sbatch sbatch_primer_match.sh 129
+sbatch sbatch_primer_match.sh 134
+sbatch sbatch_primer_match.sh 135
+sbatch sbatch_primer_match.sh 144
+sbatch sbatch_primer_match.sh 149
+

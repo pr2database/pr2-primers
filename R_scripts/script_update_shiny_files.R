@@ -20,15 +20,25 @@
   library("rio") 
    
   library(dvutils)
+   
+   library(here)
 })
 
 # ===========================================================
-#     Read primers
+#     Read parameters
 # ===========================================================
 
-file_param <- "param_pr2_primers.R"
+file_param <- here("R_scripts/param_pr2_primers.R")
 source(file_param)
 cat(readChar(file_param, 1e5))
+
+
+# ===========================================================
+#     Parameters for this script
+# ===========================================================
+
+update_pr2 = FALSE
+update_new_primer_sets = FALSE
 
 # ===========================================================
 #     Primer database
@@ -59,7 +69,7 @@ primers <- primers %>%
   mutate(length = str_length(sequence)) %>% 
   relocate(length, .after = `sequence revcomp`) %>%  
   arrange(gene, start_yeast) %>% 
-  mutate(doi_html = case_when(!is.na(doi) ~ str_c('<a href="https://doi.org/', doi,'">', doi, '</a>'),
+  mutate(doi_html = case_when(!is.na(doi) ~ str_c('<a href="https://doi.org/', doi,'" target="_blank">', doi, '</a>'),
                          TRUE ~ doi)) %>%  
   relocate(doi_html, .after = doi)
     
@@ -83,71 +93,63 @@ primers <- primers %>%
                    rev_end_yeast= end_yeast), 
             by = c("rev_id" = "primer_id")) %>% 
     mutate(amplicon_size = rev_end_yeast - fwd_start_yeast + 1) %>% 
-    mutate(doi_html = case_when(!is.na(doi) ~ str_c('<a href="https://doi.org/', doi,'">', doi, '</a>'),
-                           TRUE ~ doi))  %>% 
+    mutate(doi_html = case_when(!is.na(doi) ~ str_c('<a href="https://doi.org/', doi,'" target="_blank">', doi, '</a>'),
+                           TRUE ~ doi),
+           metabarcoding_doi_html = case_when(!is.na(metabarcoding_doi) ~ str_c('<a href="https://doi.org/', metabarcoding_doi,'" target="_blank">', metabarcoding_doi, '</a>'),
+                                TRUE ~ metabarcoding_doi))  %>% 
     rename_all(funs(str_replace(., "_yeast", ""))) %>% 
-    select(-remark_internal, -used_in) %>%
+    select(-remark_internal) %>%
     relocate(fwd_id, .before = fwd_name) %>% 
     relocate(rev_id, .before = rev_name) %>%
-    relocate(reference, doi, remark, .after = last_col()) %>%  
+    relocate(reference, doi,metabarcoding_reference, metabarcoding_doi, remark, .after = last_col()) %>%  
     relocate(doi_html, .after = doi) %>% 
+    relocate(metabarcoding_doi_html, .after = metabarcoding_doi) %>% 
     arrange(gene_region,  fwd_start, rev_start) 
 
 # Save the primer files -------------------------------------------------------
 
-export(primers, "../shiny/data/primers.rds")
-export(primer_sets, "../shiny/data/primer_sets.rds")  
+export(primers, here("data/primers.rds"))
+export(primer_sets, here("data/primer_sets.rds"))  
+
+file_name = str_c("R_paper/output/Table_primers_",gene_selected, ".xlsx")
+export(primer_sets, file = here(file_name), firstActiveRow = 2)
 
 
 # ===========================================================
 #     PR2 database version 4.12.
 # ===========================================================
 
-
-load("../../versions/4.12.0/pr2.rda")  
-
-# Only keep sequences with different sequence_hash
-
-pr2 <- pr2 %>%  
-  filter (!str_detect(sequence,"[^ATGCU]")) %>% # Remove sequences with ambiquities
-  filter(! str_detect(pr2_accession, "_UC")) %>% # Remove sequences for which the introns have been removed
-  filter(gene == gene_selected )  %>%  # Keep only 18S
-  filter(is.na(removed_version)) %>%  # Remove sequences that have been removed
-  filter(sequence_length >= sequence_length_min) %>% # Remove sequences that are too short
-  select(pr2_accession, kingdom:genus, species, sequence:sequence_hash) %>% 
-  distinct(sequence_hash, .keep_all = TRUE) %>% 
-  select(-sequence_hash)
-
-
+if (update_pr2){
+  load("../../versions/4.12.0/pr2.rda")  
   
-
-# Save the database -------------------------------------------------------
-
-saveRDS(primers, "../shiny/data/primers.rds")
-saveRDS(primer_sets, "../shiny/data/primer_sets.rds")  
-saveRDS(pr2, "../shiny/data/pr2_4.12.0.rds")  
-
-  file_name = str_c("../output/Table_primers_",gene_selected, ".xlsx")
-  export(primer_sets, file = file_name, firstActiveRow = 2)
-
+  # Only keep sequences with different sequence_hash
   
+  pr2 <- pr2 %>%  
+    filter (!str_detect(sequence,"[^ATGCU]")) %>% # Remove sequences with ambiquities
+    filter(! str_detect(pr2_accession, "_UC")) %>% # Remove sequences for which the introns have been removed
+    filter(gene == gene_selected )  %>%  # Keep only 18S
+    filter(is.na(removed_version)) %>%  # Remove sequences that have been removed
+    filter(sequence_length >= sequence_length_min) %>% # Remove sequences that are too short
+    select(pr2_accession, kingdom:genus, species, sequence:sequence_hash) %>% 
+    distinct(sequence_hash, .keep_all = TRUE) %>% 
+    select(-sequence_hash)
+  
+  
+    
+  
+  # Save the database -------------------------------------------------------
+  
+  export(pr2, here("data/pr2_4.12.0.rds"))
+
+}  
   
 # ===========================================================
-#     Summarize matches
+#      Build the file for all primer sets
 # ===========================================================
   
 # This is to be done only when new primer sets are computed
 
-
-# Build the file for all primer sets --------------------------------------
-
-primer_sets <- primer_sets %>%
-  filter(
-    gene == "18S rRNA",
-    !is.na(doi),
-    !str_detect(gene_region, "ITS|cloning|full")
-  ) %>%
-  mutate(specific = ifelse(is.na(specificity), "general", "specific"))
+if (update_new_primer_sets){
 
 
   pr2_match_list <- list()
@@ -157,9 +159,9 @@ primer_sets <- primer_sets %>%
     cat("i = ", i, "\n")
     
     rda_file_label <- str_c(sprintf("_set_%03d", primer_sets$primer_set_id[i]), "_mismatches_", max_mismatch)
-    file_name = str_c("../shiny/data/pr2_match_", gene_selected ,rda_file_label, ".rda")
+    file_name = str_c("data/pr2_match_", gene_selected ,rda_file_label, ".rda")
     
-    tryCatch(load(file=file_name), 
+    tryCatch(load(file=here(file_name)), 
              error=function(e) {
                warning(stringr::str_c("Cannot read file: ", file_name))
                skip_to_next <<- TRUE        },
@@ -174,34 +176,54 @@ primer_sets <- primer_sets %>%
   pr2_match_final <- pr2_match_list %>% 
   reduce(bind_rows)
   
-  saveRDS(pr2_match_final, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, ".rds"))
+  saveRDS(pr2_match_final, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, ".rds")))
 
+}
+
+# ===========================================================
+#     Update primer sets and create labels
+# ===========================================================
+
+primer_sets <- primer_sets %>%
+  filter(
+    str_detect(gene, "18S"),
+    !is.na(doi),
+    !str_detect(gene_region, "ITS"),
+    str_detect(used_for, "metabarcoding")
+  ) %>%
+  mutate(specific = ifelse(is.na(specificity), "general", "specific"))
+
+
+primer_sets_labels <- primer_sets %>% 
+  mutate(primer_set_label_short = str_c(str_sub(gene_region,1,2), 
+                                        sprintf("%02d", primer_set_id), 
+                                        str_sub(str_replace_na(specificity, replacement = ""),1,3),
+                                        sep=" "),
+         primer_set_label_long = str_c(gene_region, 
+                                       primer_set_name, "-", 
+                                       str_replace_na(specificity, "general"), 
+                                       sep = " ")
+  ) %>% 
+  # Remove the last underscore if left by itself
+  mutate(primer_set_label_short = str_replace(primer_set_label_short, " $", "")) %>% 
+  select(primer_set_id, 
+         primer_set_label_short,
+         primer_set_label_long,
+         # gene_region, 
+         specific,
+         specificity) 
+
+# ===========================================================
+#     Summarize matches
+# ===========================================================
+
+pr2_match_final <- readRDS(file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, ".rds")))  
+  
 
 # Filter the pr2_match dataframe ------------------------------------------
 
-  
-
   print(str_c("Before filtration: ", nrow(pr2_match_final)))
 
-  primer_sets_labels <- primer_sets %>% 
-    mutate(primer_set_label_short = str_c(str_sub(gene_region,1,2), 
-                      sprintf("%02d", primer_set_id), 
-                      str_sub(str_replace_na(specificity, replacement = ""),1,3),
-                      sep=" "),
-           primer_set_label_long = str_c(gene_region, 
-                                         primer_set_name, "-", 
-                                         str_replace_na(specificity, "general"), 
-                                         sep = " ")
-           ) %>% 
-    # Remove the last underscore if left by itself
-    mutate(primer_set_label_short = str_replace(primer_set_label_short, " $", "")) %>% 
-    select(primer_set_id, 
-           primer_set_label_short,
-           primer_set_label_long,
-           # gene_region, 
-           specific,
-           specificity) 
-  
   pr2_match_final <- pr2_match_final%>% 
       left_join(primer_sets_labels) %>% 
     # Remove sequences for which the introns have been removed
@@ -307,8 +329,8 @@ primer_sets <- primer_sets %>%
 
 ## Save summaries
 
-  saveRDS(pr2_match_summary_primer_set, file=str_c("../shiny/data/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
+  saveRDS(pr2_match_summary_primer_set, file=here(str_c("data/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds")))
 
-  saveRDS(pr2_match_summary_primer_set, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds"))
-  saveRDS(pr2_match_summary_primer_set_sg, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_sg.rds"))
-  saveRDS(pr2_match_summary_primer_set_class, file=str_c("../output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds"))  
+  saveRDS(pr2_match_summary_primer_set, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds")))
+  saveRDS(pr2_match_summary_primer_set_sg, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_sg.rds")))
+  saveRDS(pr2_match_summary_primer_set_class, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds")))  

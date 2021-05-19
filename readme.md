@@ -12,12 +12,13 @@ An [interactive database](https://app.pr2-primers.org/) of eukaryotic rRNA prime
 
 ### Panels
 
-* About: Basic information 
-* Primers: table with download
-* Primer sets: table with download
-* Amplification - overview: Give for all primer sets tested % of sequences amplified and amplicon size
-* Amplification - detail: For one primer set tested, detail for different taxonomic levels (kingdom, supergroup, division, class)
-* Test your own: Test your primers against PR2 version 4.12.0 and Silva seed 132
+* **About**: Basic information 
+* **Primers**: table with download
+* **Primer sets**: table with download
+* **Amplification - overview**: Give for all primer sets tested % of sequences amplified and amplicon size
+* **Amplification - detail**: For one primer set tested, detail for different taxonomic levels (kingdom, supergroup, division, class)
+* **Test your primer/probe**: Test a single primer or probe against PR2 version 4.12.0 and Silva seed 132
+* **Test your primer set**: Test your primer set against PR2 version 4.12.0 and Silva seed 132
 
 ### Errors
 
@@ -44,6 +45,10 @@ Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer da
 * David Bass: david.bass@cefas.co.uk
 
 ### Versions
+
+1.1 - 2021-05-17
+* Panel to test individual primer or probes.
+* Add new primers and primer sets.
 
 1.0.4 - 2021-01-26
 * Add time out of 10 min: after 10 min of inactivity close browser window and stop app.

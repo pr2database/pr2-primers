@@ -5,6 +5,8 @@ install.packages("shinycssloaders") # For the spinning wheel
 
 install.packages("markdown") # To display text boxes in md
 
+install.packages("here") # For file reference
+
 install.packages("rio") # For export/import
 
 install.packages("patchwork")

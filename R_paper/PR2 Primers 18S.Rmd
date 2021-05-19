@@ -46,18 +46,21 @@ Load the variables common to the different scripts and the necessary libraries
 
 # Libraries tidyr ---------------------------------------------------------
 
-  library("ggplot2")
+  library(ggplot2)
   theme_set(theme_light())
-  library("dplyr")   
-  library("readxl")
+  
+  library(dplyr)   
+  library(readxl)
   library(openxlsx)
-  library("tibble")
-  library("readr")
-  library("purrr")
-  library("forcats")
-  library("lubridate")
-  library("stringr")
-  library("rio")
+  library(tibble)
+  library(readr)
+  library(purrr)
+  library(forcats)
+  library(lubridate)
+  library(stringr)
+  library(rio)
+  
+  library(here)
   
   library(patchwork)
 
@@ -107,22 +110,24 @@ Only keep the 18S primers with V region
 
 ```{r}
 
-  primers <- import("../data/primers.rds")
-  primer_sets <- import("../data/primer_sets.rds")  
+  primers <- import(here("data/primers.rds"))
+  primer_sets <- import(here("data/primer_sets.rds"))  
   
   
   if(gene_selected == "18S_rRNA") {
   
     primers <- primers %>% 
-      filter(gene == "18S rRNA",
-             !is.na(doi)
+      filter(str_detect(gene, "18S"),
+             !is.na(doi),
+             type == "primer"
             )
     
       
     primer_sets <- primer_sets %>% 
-      filter(gene == "18S rRNA",
+      filter(str_detect(gene, "18S"),
              !is.na(doi) ,
-             !str_detect(gene_region,"ITS|cloning|full")
+      !str_detect(gene_region, "ITS"),
+      str_detect(used_for, "metabarcoding")
             )
       
     
@@ -374,19 +379,19 @@ latex_table(table = table_primer_sets,
 
 ```
 
-### Table - Primer sets stats - Modify for multi column before saving
+### Supplementary Table - Primer sets stats - Modify for multi column before saving
 ```{r, eval=FALSE}
 
 
 
-# latex_table(table = table_primer_sets_ampli,
-#             caption = "Overall characteristics of primer sets listed in the pr2-primers database.",
-#             label = "tab:primer_sets_ampli",
-#             file = full_file_name("table_primer_sets_ampli.tex"),
-#             align = c("l","l","c", "c"),
-#             scalebox = 1,
-#             digits= 1
-# )
+latex_table(table = filter(table_primer_sets_ampli, !str_detect(parameter, "ampli_size")),
+            caption = "Overall characteristics of primer sets listed in the pr2-primers database.",
+            label = "tabsup:primer_sets_ampli",
+            file = full_file_name("table_sup_primer_sets_ampli.tex"),
+            align = c("l","l","c", "c"),
+            scalebox = 1,
+            digits= 1
+)
 
 ```
 
@@ -394,17 +399,17 @@ latex_table(table = table_primer_sets,
 ```{r, eval=FALSE}
 
 table <- primers %>% 
-  select(primer_id, name, sequence, direction, start_yeast, specificity, doi)
+  select(primer_id, name, sequence, direction, start_yeast, specificity, reference)
  
 add.to.row <- list()
 add.to.row$pos <- list(0, 0, 0, 0, 0)
 add.to.row$command <- c( 
   # Header for first page
-  "id & Name & Sequence & Direction & Start (yeast) & Specificity & DOI \\\\\n",
+  "id & Name & Sequence & Direction & Start & Specificity & Reference \\\\\n",
   "\\endfirsthead \n \\hline \n",
   
   # Header for other pages
-  "id & Name & Sequence & Direction & Start (yeast) & Specificity & DOI \\\\\n",
+  "id & Name & Sequence & Direction & Start & Specificity & Reference \\\\\n",
   "\\hline \n \\endhead \n",
   
   # Footers
@@ -413,7 +418,7 @@ add.to.row$command <- c(
 
 
 latex_table(table = table,
-            caption = "List of primers in the pr2-primers database ordered by start position relative to the sequence of the yeast \textit{Saccharomyces cerevisiae} (FU970071).",
+            caption = "List of 18S rRNA primers in the pr2-primers database ordered by start position relative to the sequence of the yeast \\textit{Saccharomyces cerevisiae} (FU970071).  Some specific primers do not match the yeast sequence and are found at the bottom of the table. DOI for reference can be found in the on-line web application.",
             label = "tabsup:primers",
             file = full_file_name("table_sup_primers.tex"),
             align = c("l","l","l", "l","l","l","l", "l" ),
@@ -427,20 +432,24 @@ latex_table(table = table,
 ```
 ## Supplementary Table - Primer sets
 ```{r, eval=FALSE}
+table_amplicon_size <- pr2_match_summary_primer_set %>% 
+  filter(kingdom == "Eukaryota") %>% 
+  select(primer_set_id, ampli_size_mean)
 
-table <- primer_sets %>% 
-  select(primer_set_id, primer_set_name, fwd_name, rev_name, gene_region, specificity, doi) %>% 
+table <- primer_sets %>%
+  left_join(table_amplicon_size) %>% 
+  select(primer_set_id, primer_set_name, fwd_name, rev_name, gene_region, ampli_size_mean, specificity, reference) %>% 
   arrange(primer_set_id)
  
 add.to.row <- list()
 add.to.row$pos <- list(0, 0, 0, 0, 0)
 add.to.row$command <- c( 
   # Header for first page
-  "id & Name & Primer fwd & Primer rev & Region & Specificity & DOI \\\\\n",
+  "id & Name & Primer fwd & Primer rev & Region & Size & Specificity & Reference \\\\\n",
   "\\endfirsthead \n \\hline \n",
   
   # Header for other pages
-  "id & Name & Primer fwd & Primer rev & Region & Specificity & DOI \\\\\n",
+  "id & Name & Primer fwd & Primer rev & Region & Size & Specificity & Reference \\\\\n",
   "\\hline \n \\endhead \n",
   
   # Footers
@@ -449,10 +458,10 @@ add.to.row$command <- c(
 
 
 latex_table(table = table,
-            caption = "List of primer sets in the pr2-primers database.",
+            caption = "List of 18S rRNA primer sets used for metabarcoding in the pr2-primers database.  Size corresponds to the average amplicon size (bp) for sequences from the PR2 database. DOI for reference can be found in the on-line web application.",
             label = "tabsup:primer_sets",
             file = full_file_name("table_sup_primer_sets.tex"),
-            align = c("l","l","l", "l","l","l","l", "l" ),
+            align = c("l","l","l", "l","l","l","l", "l", "l"),
             digits= 0,
             add.to.row = add.to.row,
             include.colnames = FALSE, 
@@ -1390,7 +1399,7 @@ fig_1
 
 
 ggsave(plot= fig_1 , filename="figs/fig_pct_sizes_mismatches_all.pdf",
-           width = 19 , height = 17, scale=2, units="cm", useDingbats=FALSE)
+           width = 19 , height = 20, scale=2, units="cm", useDingbats=FALSE)
 
 
 
@@ -1535,12 +1544,12 @@ fig <- ggplot(filter(primer_sets, !is.na(fwd_start))) +
     y = "",
     legend = ""
   ) +
-  xlim(0,2200) +
+  xlim(0,2400) +
   coord_cartesian(clip = "off") 
 
 fig
 
 ggsave(plot= fig , filename=str_c("figs/fig_primer_sets_position.pdf"),
-           width = 10 , height = 15, scale=2, units="cm", useDingbats=FALSE)
+           width = 10 , height = 15, scale=2.2, units="cm", useDingbats=FALSE)
   
 ```

@@ -237,9 +237,9 @@ plot_matches <- function( kingdom_one = "Eukaryota", type = "general") {
   }
   
   
-# Function to plot mismatches at a given taxonomic level for user primer match  -----
+# Function to plot mismatches at a given taxonomic level for user primer set match  -----
 
-  plot_matches_simple_taxa <- function(df, taxo_level_quoted = "supergroup", taxo_name = "Chlorophyta"){
+  plot_primer_set_matches_simple_taxa <- function(df, taxo_level_quoted = "supergroup", taxo_name = "Chlorophyta"){
     
 
     taxo_level=as.symbol(taxo_level_quoted)
@@ -256,7 +256,7 @@ plot_matches <- function( kingdom_one = "Eukaryota", type = "general") {
 
     
     df2 <- df %>% 
-      primer_summary_simple(taxo_level=!!taxo_level_below) %>% 
+      primer_set_summary_simple(taxo_level=!!taxo_level_below) %>% 
       tidyr::pivot_longer(cols = ends_with("_pct"), 
                           names_to = "pct_category", 
                           values_to = "pct_seq") %>% 
@@ -304,6 +304,63 @@ plot_matches <- function( kingdom_one = "Eukaryota", type = "general") {
     gg <- g1+g2 
     
     return(list(gg = gg, n_taxa = n_taxa))
-  }  
+  } 
+  
+# Function to plot mismatches at a given taxonomic level for user primer/probe match  -----------------------
+  
+  plot_primer_matches_simple_taxa <- function(df, taxo_level_quoted = "supergroup", taxo_name = "Chlorophyta"){
+    
+    
+    taxo_level=as.symbol(taxo_level_quoted)
+    taxo_level_below_quoted = taxo_levels[which(taxo_levels == taxo_level_quoted) + 1]
+    taxo_level_below=as.symbol(taxo_level_below_quoted)
+    
+    df <- df %>% 
+      filter(!!taxo_level == taxo_name)  
+    
+    
+    # --- Compute statistics according to taxonomical level
+    pct_category_order <- data.frame(pct_category = c("ampli_pct","fwd_pct","rev_pct"), 
+                                     pct_category_order = c(1, 3, 2))
+    
+    
+    df2 <- df %>% 
+      primer_summary_simple(taxo_level=!!taxo_level_below) %>% 
+      tidyr::pivot_longer(cols = ends_with("_pct"), 
+                          names_to = "pct_category", 
+                          values_to = "pct_seq") %>% 
+      left_join(pct_category_order)  
+    
+    # print(df2)
+    
+    
+    # --- Computer number of taxa  to adjust the height of the graph
+    n_taxa = length(unique(pull(df2, !!taxo_level_below)))
+    n_taxa = max(4, n_taxa) # If only 1 taxa, too small...
+    
+    # print(n_taxa)
+    
+    # --- Plot % of mismatches  
+    
+    g1 <- ggplot(df2) + 
+      geom_col(aes(x=str_c(!!taxo_level_below, " - n = ", n_seq), 
+                   y=pct_seq, 
+                   fill=fct_reorder(pct_category, pct_category_order)), width=.7, position = "dodge") +
+      theme_bw() +
+      xlab("") + ylab("% of sequences amplified") + 
+      scale_fill_manual(name = "",  values = c("fwd_pct" = "black"), 
+                        labels=c( "Primer/Probe")) +
+      theme(axis.text.y = element_text(angle = 0, hjust = 0, vjust = 0)) +
+      ylim(0,100) +
+      coord_flip() + 
+      guides(fill = guide_legend(nrow = 1)) +
+      theme(legend.position = "top", legend.box = "horizontal") 
+    
+    
+    
+    gg <- g1 
+    
+    return(list(gg = gg, n_taxa = n_taxa))
+  } 
 
     print("graphics.R done")

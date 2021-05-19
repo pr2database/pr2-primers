@@ -52,7 +52,7 @@ primer_summary_detailed <- function(pr2_match, taxo_level=supergroup){
 
 # Function to summarize at any level --------------------------------------
 
-primer_summary_simple <- function(pr2_match, taxo_level=supergroup){
+primer_set_summary_simple <- function(pr2_match, taxo_level=supergroup){
   # debug
   # load("data/pr2_match_18S_rRNA_set_004_mismatches_2.rda")
   # taxo_level=supergroup 
@@ -69,9 +69,25 @@ primer_summary_simple <- function(pr2_match, taxo_level=supergroup){
 }
 
 
+primer_summary_simple <- function(pr2_match, taxo_level=supergroup){
+  # debug
+  # load("data/pr2_match_18S_rRNA_set_004_mismatches_2.rda")
+  # taxo_level=supergroup 
+  
+  summary <-  pr2_match  %>%  
+    group_by(across({{taxo_level}}))  %>% 
+    summarise(fwd_pct = sum(!is.na(fwd_pos))/n()*100,
+              n_seq = n()) 
+  
+  return(summary)
+  
+}
+
+
+
 # Function to compute mismatches ------------------------------------------
 
-primer_match <- function(fwd_seq="GCCAGCAVCYGCGGTAAY", rev_seq ="CCGTCAATTHCTTYAART", 
+primer_set_match <- function(fwd_seq="GCCAGCAVCYGCGGTAAY", rev_seq ="CCGTCAATTHCTTYAART", 
                          fwd_max_mismatch = 0 , rev_max_mismatch = 0){
   
    print("Start primer matching")
@@ -131,5 +147,54 @@ primer_match <- function(fwd_seq="GCCAGCAVCYGCGGTAAY", rev_seq ="CCGTCAATTHCTTYA
   
    return(pr2_match)
 }
+
+# Function to compute mismatches for a primer/probe -----------------------------
+primer_match <- function(fwd_seq="GCCAGCAVCYGCGGTAAY", 
+                         fwd_max_mismatch = 0,
+                         primer_type = "fwd"){
+  
+  print("Start primer matching")
+  print(fwd_max_mismatch)
+
+  
+  fwd <-  DNAString(fwd_seq)
+  if (!str_detect(primer_type, "fwd")) {
+    fwd <-  reverseComplement(fwd)
+    }
+  
+  seq <- DNAStringSet(pr2$sequence)
+  names(seq) <- pr2$pr2_accession
+  
+  fwd_pos <- vmatchPattern(fwd, seq, max.mismatch=fwd_max_mismatch, min.mismatch=0, 
+                           with.indels=FALSE, fixed=FALSE, algorithm="auto")
+
+  # Need to unlist the MIndex position
+  fwd_pos_list <- unlist(fwd_pos)
+
+  # Use mismatch to find the position of the mismatch... 
+  # https://bioconductor.org/packages/release/bioc/vignettes/BSgenome/inst/doc/GenomeSearching.pdf
+  
+  # Create data frames from the list
+  fwd_matches <- data.frame( fwd_pos=fwd_pos_list@start, pr2_accession =fwd_pos_list@NAMES)
+
+  # Cheking whether some sequences have more than one matches fwd
+  fwd_matches_pb <- fwd_matches %>% group_by(pr2_accession) %>% 
+    summarize(n_matches=n()) %>% 
+    filter(n_matches >1 )
+  print(sprintf("Number of sequences with more than one match fwd : %d",nrow(fwd_matches_pb)))
+  
+
+  # If several matches, take the first match for fwd and the last match for the reverse
+  fwd_matches_unique <- fwd_matches %>%  group_by(pr2_accession) %>%
+    summarise(fwd_pos = min(fwd_pos))
+
+  # Merge the fwd and reverse position, compute the length of the amplicon and check it is bigger than sum of the lengths of the two primers
+  pr2_match <- pr2 %>% 
+    select(pr2_accession, kingdom:genus, species) %>%  
+    left_join(fwd_matches_unique)
+  
+  return(pr2_match)
+}
+
 
   print("primers.R done")
