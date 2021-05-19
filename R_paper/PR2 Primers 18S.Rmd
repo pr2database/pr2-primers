@@ -1457,7 +1457,7 @@ ggsave(plot= fig , filename="figs/fig_examples_V4_V9.pdf",
 
 
 
-## Fig. S2 and S5 - Supergroup analysis
+## Fig. S2 and S5 - Supergroup analysis with size information
 
 ```{r,  fig.height=9, fig.width=9, eval=FALSE}
 
@@ -1475,6 +1475,34 @@ print(fig_3)
 height <- row_height*(ceiling(n_primers[[specific_one]]/ncol))
 
 ggsave(plot= fig_3 , filename=str_c("figs/fig_supergroup_", specific_one, ".pdf"),
+           width = 20 , height = height, scale=1.75, units="cm", useDingbats=FALSE)
+
+# ggsave(plot= fig_supergroup[[str_c("mismatches", specific_one, sep = " ")]] , filename=str_c("figs/fig_supergroup_", specific_one, "_A.pdf"),
+#            width = 14 , height = height/2, scale=1.75, units="cm", useDingbats=FALSE)
+# 
+# ggsave(plot=  fig_supergroup[[str_c("size", specific_one, sep = " ")]] , filename=str_c("figs/fig_supergroup_", specific_one, "_B.pdf"),
+#            width = 14 , height = height/2, scale=1.75, units="cm", useDingbats=FALSE)
+
+}
+
+```
+## Fig. S2 and S5 - Supergroup analysis without size information
+
+```{r,  fig.height=9, fig.width=9, eval=FALSE}
+
+row_height = 5
+
+for (specific_one in c("general", "specific")) {
+
+
+fig_3 <- cowplot::plot_grid(fig_supergroup[[str_c("mismatches", specific_one, sep = " ")]], NULL,
+                  ncol = 2, nrow = 1, align = "v" , rel_widths= c(13,0.2))
+
+print(fig_3)
+
+height <- row_height*(ceiling(n_primers[[specific_one]]/ncol))
+
+ggsave(plot= fig_3 , filename=str_c("figs/fig_supergroup_mismatches_", specific_one, ".pdf"),
            width = 20 , height = height, scale=1.75, units="cm", useDingbats=FALSE)
 
 # ggsave(plot= fig_supergroup[[str_c("mismatches", specific_one, sep = " ")]] , filename=str_c("figs/fig_supergroup_", specific_one, "_A.pdf"),
