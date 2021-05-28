@@ -39,6 +39,7 @@ cat(readChar(file_param, 1e5))
 
 update_pr2 = FALSE
 update_new_primer_sets = FALSE
+update_stats_primer_sets = FALSE
 
 # ===========================================================
 #     Primer database
@@ -116,7 +117,7 @@ export(primer_sets, file = here(file_name), firstActiveRow = 2)
 
 
 # ===========================================================
-#     PR2 database version 4.12.
+#     Update PR2 database - current version 4.12.
 # ===========================================================
 
 if (update_pr2){
@@ -145,9 +146,9 @@ if (update_pr2){
   
 # ===========================================================
 #      Build the file for all primer sets
+# 
+# Note: This is to be done only when new primer sets are computed
 # ===========================================================
-  
-# This is to be done only when new primer sets are computed
 
 if (update_new_primer_sets){
 
@@ -180,8 +181,17 @@ if (update_new_primer_sets){
 
 }
 
+
 # ===========================================================
-#     Update primer sets and create labels
+#     Update primer sets stats
+# 
+# Note: This is to be done only when new primer sets are computed
+# ===========================================================
+
+
+if (update_stats_primer_sets){
+# ===========================================================
+#     1- Update primer sets and create labels
 # ===========================================================
 
 primer_sets <- primer_sets %>%
@@ -214,7 +224,7 @@ primer_sets_labels <- primer_sets %>%
          specificity) 
 
 # ===========================================================
-#     Summarize matches
+#     2 - Summarize matches
 # ===========================================================
 
 pr2_match_final <- readRDS(file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, ".rds")))  
@@ -334,3 +344,7 @@ pr2_match_final <- readRDS(file=here(str_c("R_paper/output/pr2_match_", gene_sel
   saveRDS(pr2_match_summary_primer_set, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary.rds")))
   saveRDS(pr2_match_summary_primer_set_sg, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_sg.rds")))
   saveRDS(pr2_match_summary_primer_set_class, file=here(str_c("R_paper/output/pr2_match_", gene_selected ,"_mismatches_", max_mismatch, "_summary_class.rds")))  
+  
+}
+  
+  

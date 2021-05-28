@@ -3,15 +3,17 @@
 ## Major steps
 
 1. Make sure that the shiny application works on R studio
-1. Can run docker 
 2. Build docker file 
   * from shiny-verse
-  * Install libraries as needed
+  * Install packages as needed (load install_packages.R)
   * Use the shiny-server command
 3. Test docker locally
-4. Upload to Google cloud
-  * Set up neough memory (2 Go for pr2 primers)
-5. Upload to Docker web site
+4. Upload to GitHub, this will automatically force compilation on Google cloud and Docker site.
+
+If the Docker application has not been yet uploaded to Google
+1. Upload to Google cloud
+  * Set up enough memory (2 Go for pr2 primers)
+2. Upload to Docker web site
 
 ## Building docker image
 

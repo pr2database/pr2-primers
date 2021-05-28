@@ -46,7 +46,7 @@ Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer da
 
 ### Versions
 
-1.1 - 2021-05-17
+1.1.0 - 2021-05-17
 * Panel to test individual primer or probes.
 * Add new primers and primer sets.
 
