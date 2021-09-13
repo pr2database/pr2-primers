@@ -1,6 +1,7 @@
 ## The PR2 primer database
 ---
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4433214.svg)](https://doi.org/10.5281/zenodo.4433214)
+[![DOI](https://zenodo.org/badge/191439796.svg)](https://zenodo.org/badge/latestdoi/191439796)
+
 
 An [interactive database](https://app.pr2-primers.org/) of eukaryotic rRNA primers and primer sets for metabarcoding studies compiled from the literature. 
 
@@ -27,7 +28,7 @@ Please report errors or primer sets not listed here in the [Issues page of the P
 
 ### Citation
 
-Vaulot D., Geisen S., Mahé F., Bass D. 2020. pr2-primers: an 18S rRNA primer database for protists. Methods in Ecology and Evolution submitted. [deposited to BioRxiv](https://www.biorxiv.org/content/10.1101/2021.01.04.425170v1).
+Vaulot, D., Mahé, F., Bass, D., & Geisen, S. (2021). [╔pr2-primer : An 18S rRNA primer database for protists](https://onlinelibrary.wiley.com/doi/abs/10.1111/1755-0998.13465). Molecular Ecology Resources, in press. DOI: 10.1111/1755-0998.13465
 
 ### Resources
 * Website: https://app.pr2-primers.org/
