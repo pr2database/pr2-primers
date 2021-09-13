@@ -28,7 +28,7 @@ Please report errors or primer sets not listed here in the [Issues page of the P
 
 ### Citation
 
-Vaulot, D., Mahé, F., Bass, D., & Geisen, S. (2021). [╔pr2-primer : An 18S rRNA primer database for protists](https://onlinelibrary.wiley.com/doi/abs/10.1111/1755-0998.13465). Molecular Ecology Resources, in press. DOI: 10.1111/1755-0998.13465
+Vaulot, D., Mahé, F., Bass, D., & Geisen, S. (2021). [pr2-primer : An 18S rRNA primer database for protists](https://onlinelibrary.wiley.com/doi/abs/10.1111/1755-0998.13465). Molecular Ecology Resources, in press. DOI: 10.1111/1755-0998.13465
 
 ### Resources
 * Website: https://app.pr2-primers.org/
