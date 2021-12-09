@@ -130,4 +130,5 @@ taxo_levels <- c("kingdom", "supergroup", "division", "class", "genus")
       arrange(kingdom, supergroup, division, class, order, family, genus) %>% 
       distinct()
 
+  print(pryr::mem_used())
   print("read_data.R done")

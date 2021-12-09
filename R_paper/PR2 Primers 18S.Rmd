@@ -1449,7 +1449,7 @@ fig <- cowplot::plot_grid(  legend_mismatches,
 fig
 
 ggsave(plot= fig , filename="figs/fig_examples_V4_V9.pdf",
-           width = 20 , height = 25, scale=2.5, units="cm", useDingbats=FALSE)
+           width = 20 , height = 25, scale=1.5, units="cm", useDingbats=FALSE)
 
 
 
