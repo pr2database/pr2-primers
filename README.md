@@ -1,5 +1,4 @@
-## The PR2 primer database
----
+# PR2 primer database - Paper 2020
 
 Please go to https://github.com/pr2database/pr2-primers-shiny for detailed information about the database and Shiny application source code.
 
